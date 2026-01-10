@@ -15,6 +15,7 @@ import {
 interface FileListProps {
   files: FileItem[]
   onFileClick: (file: FileItem) => void
+  onFileDoubleClick?: (file: FileItem) => void
   onDownload?: (file: FileItem) => void
   onDelete?: (file: FileItem) => void
   onCopyUrl?: (file: FileItem) => void
@@ -24,6 +25,7 @@ interface FileListProps {
 export function FileList({
   files,
   onFileClick,
+  onFileDoubleClick,
   onDownload,
   onDelete,
   onCopyUrl,
@@ -57,7 +59,8 @@ export function FileList({
           {files.map((file) => (
             <tr
               key={file.id}
-              className="border-b border-border transition-colors hover:bg-muted/50"
+              className="border-b border-border transition-colors hover:bg-muted/50 cursor-pointer"
+              onDoubleClick={() => onFileDoubleClick?.(file)}
             >
               <td className="px-6 py-2">
                 <button

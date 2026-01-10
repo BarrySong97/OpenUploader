@@ -5,7 +5,9 @@ import {
   IconLoader2,
   IconFolder,
   IconUpload,
-  IconFolderPlus
+  IconFolderPlus,
+  IconChevronLeft,
+  IconChevronRight
 } from '@tabler/icons-react'
 import type { Provider } from '@renderer/db'
 import { trpc } from '@renderer/lib/trpc'
@@ -13,6 +15,7 @@ import { Breadcrumb } from '@renderer/components/file-browser/breadcrumb'
 import { FileList } from '@renderer/components/file-browser/file-list'
 import { UploadDialog } from '@renderer/components/provider/upload-dialog'
 import { CreateFolderDialog } from '@renderer/components/provider/create-folder-dialog'
+import { FileDetailSheet } from '@renderer/components/provider/file-detail-sheet'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -68,8 +71,12 @@ function FileListSkeleton() {
 
 export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) {
   const [path, setPath] = useState<string[]>([])
+  const [cursor, setCursor] = useState<string | undefined>(undefined)
+  const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([])
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
   const [createFolderDialogOpen, setCreateFolderDialogOpen] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null)
+  const [fileDetailOpen, setFileDetailOpen] = useState(false)
 
   // Build prefix from path segments
   const prefix = useMemo(() => {
@@ -82,7 +89,8 @@ export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) 
       provider,
       bucket,
       prefix,
-      maxKeys: 100
+      cursor,
+      maxKeys: 50
     },
     {
       refetchOnWindowFocus: false,
@@ -105,22 +113,55 @@ export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) 
 
   const handleNavigate = (index: number) => {
     if (index === -1) {
-      // Home button clicked - go back to bucket list
-      onBack()
+      // Home button clicked - go to bucket root (clear path)
+      setPath([])
     } else {
       // Navigate to specific path segment
       setPath(path.slice(0, index + 1))
     }
+    // Reset pagination when navigating
+    setCursor(undefined)
+    setCursorHistory([])
   }
 
   const handleFileClick = (file: FileItem) => {
     if (file.type === 'folder') {
       setPath([...path, file.name])
+      // Reset pagination when entering folder
+      setCursor(undefined)
+      setCursorHistory([])
     } else {
-      // TODO: Preview or download file
+      // Single click on file - do nothing for now
       console.log('File clicked:', file)
     }
   }
+
+  const handleFileDoubleClick = (file: FileItem) => {
+    if (file.type === 'file') {
+      setSelectedFile(file)
+      setFileDetailOpen(true)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (data?.nextCursor) {
+      setCursorHistory([...cursorHistory, cursor])
+      setCursor(data.nextCursor)
+    }
+  }
+
+  const handlePrevPage = () => {
+    if (cursorHistory.length > 0) {
+      const newHistory = [...cursorHistory]
+      const prevCursor = newHistory.pop()
+      setCursorHistory(newHistory)
+      setCursor(prevCursor)
+    }
+  }
+
+  const currentPage = cursorHistory.length + 1
+  const hasPrevPage = cursorHistory.length > 0
+  const hasNextPage = data?.hasMore ?? false
 
   const showLoading = isLoading || isFetching
 
@@ -132,7 +173,10 @@ export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) 
           <IconArrowLeft size={16} />
         </Button>
         <span className="font-medium">{bucket}</span>
-        <div className="flex-1" />
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-6 py-2">
         <Button
           variant="outline"
           size="sm"
@@ -151,6 +195,7 @@ export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) 
           <IconFolderPlus size={16} className="mr-2" />
           New Folder
         </Button>
+        <div className="flex-1" />
         <Button
           variant="ghost"
           size="sm"
@@ -185,7 +230,11 @@ export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) 
           </div>
         ) : (
           <>
-            <FileList files={files} onFileClick={handleFileClick} />
+            <FileList
+              files={files}
+              onFileClick={handleFileClick}
+              onFileDoubleClick={handleFileDoubleClick}
+            />
             {isFetching && (
               <div className="flex items-center justify-center py-2">
                 <IconLoader2 size={16} className="animate-spin text-muted-foreground" />
@@ -195,11 +244,33 @@ export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) 
         )}
       </div>
 
-      {/* Status bar */}
+      {/* Status bar with pagination */}
       {!isLoading && !error && (
-        <div className="border-t border-border bg-muted/30 px-6 py-2 text-sm text-muted-foreground">
-          {files.length} items
-          {data?.hasMore && ' (more available)'}
+        <div className="flex items-center justify-between border-t border-border bg-muted/30 px-6 py-2 text-sm text-muted-foreground">
+          <span>{files.length} items</span>
+          {(hasPrevPage || hasNextPage) && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handlePrevPage}
+                disabled={!hasPrevPage || isFetching}
+                className="h-7 px-2"
+              >
+                <IconChevronLeft size={16} />
+              </Button>
+              <span className="text-xs">Page {currentPage}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleNextPage}
+                disabled={!hasNextPage || isFetching}
+                className="h-7 px-2"
+              >
+                <IconChevronRight size={16} />
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -219,6 +290,15 @@ export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) 
         bucket={bucket}
         prefix={prefix}
         onSuccess={() => refetch()}
+      />
+
+      {/* File Detail Sheet */}
+      <FileDetailSheet
+        open={fileDetailOpen}
+        onOpenChange={setFileDetailOpen}
+        file={selectedFile}
+        provider={provider}
+        bucket={bucket}
       />
     </div>
   )

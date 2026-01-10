@@ -1,4 +1,5 @@
-import { S3Client, ListBucketsCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, ListBucketsCommand, ListObjectsV2Command, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { createClient } from '@supabase/supabase-js'
 import type { Provider, S3Provider, SupabaseProvider } from '../../shared/schema/provider'
 
@@ -493,5 +494,70 @@ export async function createFolder(input: CreateFolderInput): Promise<CreateFold
     return createS3Folder(provider, bucket, path)
   } else {
     return createSupabaseFolder(provider, bucket, path)
+  }
+}
+
+// ============ Get Object URL ============
+
+export interface GetObjectUrlInput {
+  provider: Provider
+  bucket: string
+  key: string
+  expiresIn?: number // seconds, default 3600
+}
+
+export interface GetObjectUrlResult {
+  url: string
+  expiresAt: string
+}
+
+async function getS3ObjectUrl(
+  provider: S3Provider,
+  bucket: string,
+  key: string,
+  expiresIn: number = 3600
+): Promise<GetObjectUrlResult> {
+  const client = createS3Client(provider)
+
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key
+  })
+
+  const url = await getSignedUrl(client, command, { expiresIn })
+  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
+
+  return { url, expiresAt }
+}
+
+async function getSupabaseObjectUrl(
+  provider: SupabaseProvider,
+  bucket: string,
+  key: string,
+  expiresIn: number = 3600
+): Promise<GetObjectUrlResult> {
+  const supabase = createClient(
+    provider.projectUrl,
+    provider.serviceRoleKey || provider.anonKey || ''
+  )
+
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(key, expiresIn)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
+
+  return { url: data.signedUrl, expiresAt }
+}
+
+export async function getObjectUrl(input: GetObjectUrlInput): Promise<GetObjectUrlResult> {
+  const { provider, bucket, key, expiresIn } = input
+
+  if (provider.type === 's3-compatible') {
+    return getS3ObjectUrl(provider, bucket, key, expiresIn)
+  } else {
+    return getSupabaseObjectUrl(provider, bucket, key, expiresIn)
   }
 }

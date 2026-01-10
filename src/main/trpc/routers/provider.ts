@@ -6,7 +6,8 @@ import {
   getProviderStats,
   listObjects,
   uploadFile,
-  createFolder
+  createFolder,
+  getObjectUrl
 } from '../../services/provider-service'
 
 const listObjectsInputSchema = z.object({
@@ -31,6 +32,13 @@ const createFolderInputSchema = z.object({
   path: z.string()
 })
 
+const getObjectUrlInputSchema = z.object({
+  provider: providerSchema,
+  bucket: z.string(),
+  key: z.string(),
+  expiresIn: z.number().optional()
+})
+
 export const providerRouter = router({
   testConnection: publicProcedure.input(providerSchema).query(async ({ input }) => {
     return testConnection(input)
@@ -50,5 +58,9 @@ export const providerRouter = router({
 
   createFolder: publicProcedure.input(createFolderInputSchema).mutation(async ({ input }) => {
     return createFolder(input)
+  }),
+
+  getObjectUrl: publicProcedure.input(getObjectUrlInputSchema).query(async ({ input }) => {
+    return getObjectUrl(input)
   })
 })
