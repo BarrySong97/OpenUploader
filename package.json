@@ -26,8 +26,11 @@
     "@fontsource-variable/roboto": "^5.2.9",
     "@tanstack/query-db-collection": "^1.0.14",
     "@tanstack/react-router": "^1.146.2",
+    "@trpc/client": "^11.8.1",
+    "@trpc/server": "^11.8.1",
     "date-fns": "^4.1.0",
     "electron-updater": "^6.3.9",
+    "trpc-electron": "^0.1.2",
     "vaul": "^1.1.2"
   },
   "devDependencies": {

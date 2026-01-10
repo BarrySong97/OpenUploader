@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Provider } from '@renderer/db'
-import {
-  testConnection,
-  getProviderStats,
-  type ConnectionResult,
-  type ProviderStats
-} from '@renderer/services/provider-service'
+import { trpc } from '@renderer/lib/trpc'
+
+export interface ProviderStats {
+  buckets: { name: string; creationDate?: string }[]
+  bucketCount: number
+}
 
 export interface ProviderStatus {
   isLoading: boolean
@@ -26,7 +26,7 @@ export function useProviderStatus(provider: Provider) {
 
     try {
       // Test connection first
-      const connectionResult: ConnectionResult = await testConnection(provider)
+      const connectionResult = await trpc.provider.testConnection.query(provider)
 
       if (!connectionResult.connected) {
         setStatus({
@@ -39,7 +39,7 @@ export function useProviderStatus(provider: Provider) {
       }
 
       // Get provider stats
-      const stats = await getProviderStats(provider)
+      const stats = await trpc.provider.getStats.query(provider)
 
       setStatus({
         isLoading: false,
