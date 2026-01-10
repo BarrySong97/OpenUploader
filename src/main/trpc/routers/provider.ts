@@ -1,6 +1,35 @@
+import { z } from 'zod'
 import { publicProcedure, router } from '../trpc'
 import { providerSchema } from '../../../shared/schema/provider'
-import { testConnection, getProviderStats } from '../../services/provider-service'
+import {
+  testConnection,
+  getProviderStats,
+  listObjects,
+  uploadFile,
+  createFolder
+} from '../../services/provider-service'
+
+const listObjectsInputSchema = z.object({
+  provider: providerSchema,
+  bucket: z.string(),
+  prefix: z.string().optional(),
+  cursor: z.string().optional(),
+  maxKeys: z.number().optional()
+})
+
+const uploadFileInputSchema = z.object({
+  provider: providerSchema,
+  bucket: z.string(),
+  key: z.string(),
+  content: z.string(),
+  contentType: z.string().optional()
+})
+
+const createFolderInputSchema = z.object({
+  provider: providerSchema,
+  bucket: z.string(),
+  path: z.string()
+})
 
 export const providerRouter = router({
   testConnection: publicProcedure.input(providerSchema).query(async ({ input }) => {
@@ -9,5 +38,17 @@ export const providerRouter = router({
 
   getStats: publicProcedure.input(providerSchema).query(async ({ input }) => {
     return getProviderStats(input)
+  }),
+
+  listObjects: publicProcedure.input(listObjectsInputSchema).query(async ({ input }) => {
+    return listObjects(input)
+  }),
+
+  uploadFile: publicProcedure.input(uploadFileInputSchema).mutation(async ({ input }) => {
+    return uploadFile(input)
+  }),
+
+  createFolder: publicProcedure.input(createFolderInputSchema).mutation(async ({ input }) => {
+    return createFolder(input)
   })
 })

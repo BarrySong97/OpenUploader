@@ -1,7 +1,4 @@
-import { createTRPCProxyClient } from '@trpc/client'
-import { ipcLink } from 'trpc-electron/renderer'
+import { createTRPCReact } from '@trpc/react-query'
 import type { AppRouter } from '../../../main/trpc/router'
 
-export const trpc = createTRPCProxyClient<AppRouter>({
-  links: [ipcLink()]
-})
+export const trpc = createTRPCReact<AppRouter>()

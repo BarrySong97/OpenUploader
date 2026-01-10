@@ -79,7 +79,10 @@ export function ProviderCard({ provider }: ProviderCardProps) {
               </CardDescription>
             </div>
           </div>
-          <Badge variant={isConnected ? 'default' : 'secondary'}>
+          <Badge
+            variant={isConnected ? 'default' : 'secondary'}
+            className={isConnected ? 'bg-green-500 text-white' : ''}
+          >
             {isLoading ? 'Checking...' : isConnected ? 'Connected' : 'Disconnected'}
           </Badge>
         </div>

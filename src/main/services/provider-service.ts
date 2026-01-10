@@ -1,4 +1,4 @@
-import { S3Client, ListBucketsCommand } from '@aws-sdk/client-s3'
+import { S3Client, ListBucketsCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3'
 import { createClient } from '@supabase/supabase-js'
 import type { Provider, S3Provider, SupabaseProvider } from '../../shared/schema/provider'
 
@@ -17,6 +17,29 @@ export interface BucketInfo {
 export interface ProviderStats {
   buckets: BucketInfo[]
   bucketCount: number
+}
+
+export interface FileItem {
+  id: string
+  name: string
+  type: 'file' | 'folder'
+  size?: number
+  modified?: string
+  mimeType?: string
+}
+
+export interface ListObjectsInput {
+  provider: Provider
+  bucket: string
+  prefix?: string
+  cursor?: string
+  maxKeys?: number
+}
+
+export interface ListObjectsResult {
+  files: FileItem[]
+  nextCursor?: string
+  hasMore: boolean
 }
 
 // ============ S3 Endpoint Configuration ============
@@ -156,5 +179,319 @@ export async function getProviderStats(provider: Provider): Promise<ProviderStat
     return getS3ProviderStats(provider)
   } else {
     return getSupabaseProviderStats(provider)
+  }
+}
+
+// ============ List Objects ============
+
+function getMimeType(filename: string): string | undefined {
+  const ext = filename.split('.').pop()?.toLowerCase()
+  const mimeTypes: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
+    mp4: 'video/mp4',
+    webm: 'video/webm',
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    pdf: 'application/pdf',
+    zip: 'application/zip',
+    json: 'application/json',
+    txt: 'text/plain',
+    html: 'text/html',
+    css: 'text/css',
+    js: 'application/javascript'
+  }
+  return ext ? mimeTypes[ext] : undefined
+}
+
+async function listS3Objects(
+  provider: S3Provider,
+  bucket: string,
+  prefix?: string,
+  cursor?: string,
+  maxKeys: number = 100
+): Promise<ListObjectsResult> {
+  const client = createS3Client(provider)
+
+  const response = await client.send(
+    new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: prefix || '',
+      Delimiter: '/',
+      ContinuationToken: cursor,
+      MaxKeys: maxKeys
+    })
+  )
+
+  const files: FileItem[] = []
+
+  // Add folders (CommonPrefixes)
+  if (response.CommonPrefixes) {
+    for (const prefix of response.CommonPrefixes) {
+      if (prefix.Prefix) {
+        const name = prefix.Prefix.replace(/\/$/, '').split('/').pop() || ''
+        files.push({
+          id: prefix.Prefix,
+          name,
+          type: 'folder'
+        })
+      }
+    }
+  }
+
+  // Add files (Contents)
+  if (response.Contents) {
+    for (const obj of response.Contents) {
+      // Skip the prefix itself (empty key after prefix)
+      const key = obj.Key || ''
+      const name = key.split('/').pop() || ''
+      if (!name) continue
+
+      files.push({
+        id: key,
+        name,
+        type: 'file',
+        size: obj.Size,
+        modified: obj.LastModified?.toISOString(),
+        mimeType: getMimeType(name)
+      })
+    }
+  }
+
+  return {
+    files,
+    nextCursor: response.NextContinuationToken,
+    hasMore: response.IsTruncated || false
+  }
+}
+
+async function listSupabaseObjects(
+  provider: SupabaseProvider,
+  bucket: string,
+  prefix?: string,
+  cursor?: string,
+  maxKeys: number = 100
+): Promise<ListObjectsResult> {
+  const supabase = createClient(
+    provider.projectUrl,
+    provider.serviceRoleKey || provider.anonKey || ''
+  )
+
+  const offset = cursor ? parseInt(cursor, 10) : 0
+
+  const { data, error } = await supabase.storage.from(bucket).list(prefix || '', {
+    limit: maxKeys,
+    offset
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const files: FileItem[] =
+    data?.map((item) => ({
+      id: item.id || item.name,
+      name: item.name,
+      type: (item.metadata ? 'file' : 'folder') as 'file' | 'folder',
+      size: item.metadata?.size,
+      modified: item.updated_at,
+      mimeType: item.metadata?.mimetype
+    })) || []
+
+  const hasMore = data?.length === maxKeys
+  const nextCursor = hasMore ? String(offset + maxKeys) : undefined
+
+  return {
+    files,
+    nextCursor,
+    hasMore
+  }
+}
+
+export async function listObjects(input: ListObjectsInput): Promise<ListObjectsResult> {
+  const { provider, bucket, prefix, cursor, maxKeys } = input
+
+  if (provider.type === 's3-compatible') {
+    return listS3Objects(provider, bucket, prefix, cursor, maxKeys)
+  } else {
+    return listSupabaseObjects(provider, bucket, prefix, cursor, maxKeys)
+  }
+}
+
+// ============ Upload File ============
+
+export interface UploadFileInput {
+  provider: Provider
+  bucket: string
+  key: string
+  content: string // Base64 encoded
+  contentType?: string
+}
+
+export interface UploadFileResult {
+  success: boolean
+  error?: string
+}
+
+async function uploadS3File(
+  provider: S3Provider,
+  bucket: string,
+  key: string,
+  content: string,
+  contentType?: string
+): Promise<UploadFileResult> {
+  try {
+    const client = createS3Client(provider)
+    const buffer = Buffer.from(content, 'base64')
+
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType || getMimeType(key) || 'application/octet-stream'
+      })
+    )
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+async function uploadSupabaseFile(
+  provider: SupabaseProvider,
+  bucket: string,
+  key: string,
+  content: string,
+  contentType?: string
+): Promise<UploadFileResult> {
+  try {
+    const supabase = createClient(
+      provider.projectUrl,
+      provider.serviceRoleKey || provider.anonKey || ''
+    )
+
+    const buffer = Buffer.from(content, 'base64')
+    const blob = new Blob([buffer], {
+      type: contentType || getMimeType(key) || 'application/octet-stream'
+    })
+
+    const { error } = await supabase.storage.from(bucket).upload(key, blob, {
+      contentType: contentType || getMimeType(key) || 'application/octet-stream',
+      upsert: true
+    })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+export async function uploadFile(input: UploadFileInput): Promise<UploadFileResult> {
+  const { provider, bucket, key, content, contentType } = input
+
+  if (provider.type === 's3-compatible') {
+    return uploadS3File(provider, bucket, key, content, contentType)
+  } else {
+    return uploadSupabaseFile(provider, bucket, key, content, contentType)
+  }
+}
+
+// ============ Create Folder ============
+
+export interface CreateFolderInput {
+  provider: Provider
+  bucket: string
+  path: string // folder path (should end with /)
+}
+
+export interface CreateFolderResult {
+  success: boolean
+  error?: string
+}
+
+async function createS3Folder(
+  provider: S3Provider,
+  bucket: string,
+  path: string
+): Promise<CreateFolderResult> {
+  try {
+    const client = createS3Client(provider)
+    // Ensure path ends with /
+    const folderPath = path.endsWith('/') ? path : `${path}/`
+
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: folderPath,
+        Body: '',
+        ContentType: 'application/x-directory'
+      })
+    )
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+async function createSupabaseFolder(
+  provider: SupabaseProvider,
+  bucket: string,
+  path: string
+): Promise<CreateFolderResult> {
+  try {
+    const supabase = createClient(
+      provider.projectUrl,
+      provider.serviceRoleKey || provider.anonKey || ''
+    )
+
+    // Supabase doesn't have explicit folder creation
+    // Create a .keep file to represent the folder
+    const folderPath = path.endsWith('/') ? path : `${path}/`
+    const keepFilePath = `${folderPath}.keep`
+
+    const { error } = await supabase.storage.from(bucket).upload(keepFilePath, new Blob(['']), {
+      contentType: 'text/plain'
+    })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+export async function createFolder(input: CreateFolderInput): Promise<CreateFolderResult> {
+  const { provider, bucket, path } = input
+
+  if (provider.type === 's3-compatible') {
+    return createS3Folder(provider, bucket, path)
+  } else {
+    return createSupabaseFolder(provider, bucket, path)
   }
 }

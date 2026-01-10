@@ -13,7 +13,12 @@
       "Bash(pnpm typecheck:node:*)",
       "Bash(npx tsc:*)",
       "Bash(pnpm remove:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "WebFetch(domain:ui.shadcn.com)",
+      "WebFetch(domain:trpc.io)",
+      "Bash(pnpm dlx:*)",
+      "Bash(findstr:*)",
+      "Bash(find:*)"
     ]
   }
 }

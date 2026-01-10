@@ -1,7 +1,19 @@
+import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useLiveQuery, eq } from '@tanstack/react-db'
-import { providersCollection } from '@renderer/db'
+import { IconRefresh } from '@tabler/icons-react'
+import { providersCollection, type Provider } from '@renderer/db'
+import { useProviderStatus } from '@renderer/hooks/use-provider-status'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  BucketTable,
+  BucketTableSkeleton,
+  type BucketInfo
+} from '@renderer/components/provider/bucket-table'
+import { BucketBrowser } from '@renderer/components/provider/bucket-browser'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/provider/$providerId')({
   component: ProviderDetail
@@ -28,6 +40,13 @@ function ProviderDetail() {
     )
   }
 
+  return <ProviderDetailContent provider={provider} />
+}
+
+function ProviderDetailContent({ provider }: { provider: Provider }) {
+  const { isLoading, isConnected, error, stats, refresh } = useProviderStatus(provider)
+  const [currentBucket, setCurrentBucket] = useState<string | null>(null)
+
   const getProviderTypeLabel = () => {
     if (provider.type === 's3-compatible') {
       const labels: Record<string, string> = {
@@ -43,63 +62,72 @@ function ProviderDetail() {
     return 'Supabase Storage'
   }
 
+  const handleBucketClick = (bucket: BucketInfo) => {
+    setCurrentBucket(bucket.name)
+  }
+
+  const handleBackToBuckets = () => {
+    setCurrentBucket(null)
+  }
+
+  // Show bucket browser when a bucket is selected
+  if (currentBucket) {
+    return <BucketBrowser provider={provider} bucket={currentBucket} onBack={handleBackToBuckets} />
+  }
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="border-b border-border bg-background px-6 py-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{provider.name}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{getProviderTypeLabel()}</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">{provider.name}</h1>
+              <p className="mt-1 text-sm text-muted-foreground">{getProviderTypeLabel()}</p>
+            </div>
+            <Badge
+              variant={isConnected ? 'default' : 'secondary'}
+              className={isConnected ? 'bg-green-500 text-white' : ''}
+            >
+              {isLoading ? 'Checking...' : isConnected ? 'Connected' : 'Disconnected'}
+            </Badge>
           </div>
+          <Button variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
+            <IconRefresh size={16} className={cn('mr-2', isLoading && 'animate-spin')} />
+            Refresh
+          </Button>
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="mb-4 text-lg font-semibold">Provider Details</h2>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Type:</span>
-              <span>{getProviderTypeLabel()}</span>
+        {isLoading ? (
+          <div>
+            <div className="mb-4 flex items-center justify-between">
+              <Skeleton className="h-7 w-32" />
             </div>
-            {provider.type === 's3-compatible' && (
-              <>
-                {provider.region && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Region:</span>
-                    <span>{provider.region}</span>
-                  </div>
-                )}
-                {provider.endpoint && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Endpoint:</span>
-                    <span>{provider.endpoint}</span>
-                  </div>
-                )}
-              </>
-            )}
-            {provider.type === 'supabase-storage' && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Project URL:</span>
-                <span>{provider.projectUrl}</span>
-              </div>
-            )}
-            {provider.bucket && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Bucket:</span>
-                <span>{provider.bucket}</span>
-              </div>
-            )}
+            <BucketTableSkeleton />
           </div>
-        </div>
-
-        <div className="mt-6 rounded-lg border border-dashed border-border bg-muted/50 p-12 text-center">
-          <p className="text-muted-foreground">
-            File browser coming soon...
-          </p>
-        </div>
+        ) : error ? (
+          <div className="flex h-64 items-center justify-center">
+            <div className="text-center">
+              <p className="text-destructive">{error}</p>
+              <Button variant="outline" className="mt-4" onClick={refresh}>
+                Try Again
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Buckets ({stats?.bucketCount ?? 0})</h2>
+            </div>
+            <BucketTable
+              buckets={stats?.buckets ?? []}
+              onBucketClick={handleBucketClick}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

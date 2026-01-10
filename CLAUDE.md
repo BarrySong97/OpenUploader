@@ -237,3 +237,45 @@ The router plugin automatically generates `src/renderer/src/routeTree.gen.ts` du
 - Provides type definitions for all routes
 - Should not be edited manually
 - Is excluded from git and TypeScript compilation
+
+## Loading States Convention
+
+项目中有两种 Loading 状态显示方式:
+
+### Spinner (旋转图标)
+适用于:
+- 按钮操作中的加载状态
+- 小区域的刷新操作
+- 状态检查（如连接测试）
+
+示例:
+```tsx
+<IconRefresh className={cn(isLoading && 'animate-spin')} />
+```
+
+### Skeleton (骨架屏)
+适用于:
+- 列表数据加载
+- 表格数据加载
+- 卡片内容加载
+- 页面初始化加载
+
+示例:
+```tsx
+import { Skeleton } from '@/components/ui/skeleton'
+
+// 表格骨架
+<TableRow>
+  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+</TableRow>
+```
+
+### 选择原则
+| 场景 | 推荐方式 |
+|------|----------|
+| 按钮点击后的操作 | Spinner |
+| 列表/表格数据 | Skeleton |
+| 卡片内容 | Skeleton |
+| 状态刷新 | Spinner |
+| 页面首次加载 | Skeleton |
