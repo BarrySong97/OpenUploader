@@ -1,7 +1,6 @@
 import { format } from 'date-fns'
 import { IconDownload, IconCopy, IconLoader2 } from '@tabler/icons-react'
-import type { Provider } from '@renderer/db'
-import { trpc } from '@renderer/lib/trpc'
+import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import type { FileItem } from '@/lib/types'
 import { formatFileSize } from '@/lib/utils'
 import { getFileIcon } from '@/lib/file-utils'
@@ -18,7 +17,7 @@ interface FileDetailSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   file: FileItem | null
-  provider: Provider
+  provider: TRPCProvider
   bucket: string
 }
 

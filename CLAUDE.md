@@ -279,3 +279,79 @@ import { Skeleton } from '@/components/ui/skeleton'
 | 卡片内容 | Skeleton |
 | 状态刷新 | Spinner |
 | 页面首次加载 | Skeleton |
+
+## Form Validation with React Hook Form
+
+项目使用 **React Hook Form** + **Zod** 进行表单验证，配合 `Field` 组件显示验证错误。
+
+### 推荐模式
+
+使用 `Controller` + `Field` + `FieldError` 组件来构建表单字段：
+
+```tsx
+import { useForm, Controller } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Field, FieldLabel, FieldError } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+
+const form = useForm<FormType>({
+  resolver: zodResolver(formSchema),
+  mode: 'onSubmit',
+  defaultValues: { title: '' }
+})
+
+<Controller
+  name="title"
+  control={form.control}
+  render={({ field, fieldState }) => (
+    <Field data-invalid={fieldState.invalid}>
+      <FieldLabel htmlFor={field.name}>Title</FieldLabel>
+      <Input
+        {...field}
+        id={field.name}
+        aria-invalid={fieldState.invalid}
+        placeholder="Enter title"
+      />
+      {fieldState.error?.message && (
+        <FieldError>{fieldState.error.message}</FieldError>
+      )}
+    </Field>
+  )}
+/>
+```
+
+### 关键点
+
+1. **使用 `Controller`** 而不是 `FormField` - 可以访问 `fieldState` 获取验证状态
+2. **`mode: 'onSubmit'`** - 验证在提交时触发（默认行为）
+3. **`data-invalid` 属性** - 用于 Field 组件的错误样式
+4. **`aria-invalid` 属性** - 用于无障碍访问
+5. **`fieldState.error?.message`** - 直接使用错误消息作为 FieldError 的 children
+6. **`id={field.name}`** - 确保 label 和 input 正确关联
+
+### Select 组件示例
+
+```tsx
+<Controller
+  name="category"
+  control={form.control}
+  render={({ field, fieldState }) => (
+    <Field data-invalid={fieldState.invalid}>
+      <FieldLabel htmlFor={field.name}>Category</FieldLabel>
+      <Select onValueChange={field.onChange} value={field.value}>
+        <SelectTrigger id={field.name} aria-invalid={fieldState.invalid}>
+          <SelectValue placeholder="Select category" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="option1">Option 1</SelectItem>
+          <SelectItem value="option2">Option 2</SelectItem>
+        </SelectContent>
+      </Select>
+      {fieldState.error?.message && (
+        <FieldError>{fieldState.error.message}</FieldError>
+      )}
+    </Field>
+  )}
+/>
+```
+

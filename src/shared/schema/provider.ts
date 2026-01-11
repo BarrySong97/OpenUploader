@@ -24,8 +24,8 @@ export const s3ProviderSchema = z.object({
   endpoint: z.string().optional(),
   bucket: z.string().optional(),
   accountId: z.string().optional(), // R2 专用
-  createdAt: z.number(),
-  updatedAt: z.number()
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date()
 })
 
 // Supabase Storage Provider
@@ -37,8 +37,8 @@ export const supabaseProviderSchema = z.object({
   anonKey: z.string().optional(),
   serviceRoleKey: z.string().optional(),
   bucket: z.string().optional(),
-  createdAt: z.number(),
-  updatedAt: z.number()
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date()
 })
 
 export const providerSchema = z.discriminatedUnion('type', [

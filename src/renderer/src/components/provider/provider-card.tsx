@@ -7,7 +7,7 @@ import {
   IconBrandAws,
   IconServer
 } from '@tabler/icons-react'
-import type { Provider } from '@renderer/db'
+import type { TRPCProvider } from '@renderer/lib/trpc'
 import { useProviderStatus } from '@renderer/hooks/use-provider-status'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 interface ProviderCardProps {
-  provider: Provider
+  provider: TRPCProvider
 }
 
 const variantLabels: Record<string, string> = {
@@ -27,7 +27,7 @@ const variantLabels: Record<string, string> = {
   'backblaze-b2': 'Backblaze B2'
 }
 
-function getProviderIcon(provider: Provider) {
+function getProviderIcon(provider: TRPCProvider) {
   if (provider.type === 'supabase-storage') {
     return <IconCloud size={24} />
   }
@@ -42,7 +42,7 @@ function getProviderIcon(provider: Provider) {
   }
 }
 
-function getProviderTypeLabel(provider: Provider): string {
+function getProviderTypeLabel(provider: TRPCProvider): string {
   if (provider.type === 'supabase-storage') {
     return 'Supabase Storage'
   }

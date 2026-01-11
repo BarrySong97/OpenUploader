@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { IconFolderPlus, IconLoader2 } from '@tabler/icons-react'
-import type { Provider } from '@renderer/db'
-import { trpc } from '@renderer/lib/trpc'
+import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import {
   Dialog,
   DialogContent,
@@ -17,7 +16,7 @@ import { Label } from '@/components/ui/label'
 interface CreateFolderDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  provider: Provider
+  provider: TRPCProvider
   bucket: string
   prefix?: string
   onSuccess?: () => void

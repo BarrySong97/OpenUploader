@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { IconFolderSymlink, IconLoader2, IconFolder, IconChevronRight } from '@tabler/icons-react'
-import type { Provider } from '@renderer/db'
-import { trpc } from '@renderer/lib/trpc'
+import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import {
   Dialog,
   DialogContent,
@@ -28,7 +27,7 @@ interface ServerFileItem {
 interface MoveDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  provider: Provider
+  provider: TRPCProvider
   bucket: string
   file: FileItem | null
   currentPrefix?: string

@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useLiveQuery, eq } from '@tanstack/react-db'
 import { IconRefresh } from '@tabler/icons-react'
-import { providersCollection, type Provider } from '@renderer/db'
 import { useProviderStatus } from '@renderer/hooks/use-provider-status'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +12,7 @@ import {
 import { BucketBrowser } from '@renderer/components/provider/bucket-browser'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 
 export const Route = createFileRoute('/provider/$providerId')({
   component: ProviderDetail
@@ -21,11 +20,32 @@ export const Route = createFileRoute('/provider/$providerId')({
 
 function ProviderDetail() {
   const { providerId } = Route.useParams()
-  const { data: providers } = useLiveQuery((q) =>
-    q.from({ provider: providersCollection }).where(({ provider }) => eq(provider.id, providerId))
-  )
+  const { data: provider, isLoading } = trpc.provider.getById.useQuery({ id: providerId })
 
-  const provider = providers?.[0]
+  if (isLoading) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border bg-background px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div>
+                <Skeleton className="h-8 w-48" />
+                <Skeleton className="mt-1 h-4 w-24" />
+              </div>
+              <Skeleton className="h-6 w-20" />
+            </div>
+            <Skeleton className="h-9 w-24" />
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <Skeleton className="h-7 w-32" />
+          </div>
+          <BucketTableSkeleton />
+        </div>
+      </div>
+    )
+  }
 
   if (!provider) {
     return (
@@ -43,7 +63,7 @@ function ProviderDetail() {
   return <ProviderDetailContent provider={provider} />
 }
 
-function ProviderDetailContent({ provider }: { provider: Provider }) {
+function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
   const { isLoading, isConnected, error, stats, refresh } = useProviderStatus(provider)
   const [currentBucket, setCurrentBucket] = useState<string | null>(null)
 

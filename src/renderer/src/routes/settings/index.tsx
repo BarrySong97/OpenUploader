@@ -1,13 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useLiveQuery } from '@tanstack/react-db'
-import { providersCollection } from '@renderer/db'
+import { trpc } from '@renderer/lib/trpc'
 
 export const Route = createFileRoute('/settings/')({
   component: SettingsIndex
 })
 
 function SettingsIndex() {
-  const { data: providers } = useLiveQuery((q) => q.from({ provider: providersCollection }))
+  const { data: providers } = trpc.provider.list.useQuery()
 
   return (
     <div>

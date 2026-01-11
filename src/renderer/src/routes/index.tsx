@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { useLiveQuery } from '@tanstack/react-db'
 import { IconPlus } from '@tabler/icons-react'
-import { providersCollection, type S3Variant } from '@renderer/db'
+import { type S3Variant } from '@renderer/db'
 import { EmptyState } from '@/components/provider/empty-state'
 import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
 import { ProviderCard } from '@/components/provider/provider-card'
 import { Button } from '@/components/ui/button'
+import { trpc } from '@renderer/lib/trpc'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export const Route = createFileRoute('/')({
   component: Index
@@ -15,7 +16,7 @@ export const Route = createFileRoute('/')({
 function Index() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<S3Variant | undefined>()
-  const { data: providers } = useLiveQuery((q) => q.from({ provider: providersCollection }))
+  const { data: providers, isLoading } = trpc.provider.list.useQuery()
 
   const handleAddProvider = (variant?: S3Variant) => {
     setSelectedVariant(variant)
@@ -27,6 +28,30 @@ function Index() {
     if (!open) {
       setSelectedVariant(undefined)
     }
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="h-full overflow-auto">
+        <div className="mx-auto p-8">
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <Skeleton className="h-9 w-64" />
+              <Skeleton className="mt-2 h-5 w-96" />
+            </div>
+            <Skeleton className="h-10 w-32" />
+          </div>
+          <div>
+            <Skeleton className="mb-4 h-7 w-40" />
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <Skeleton className="h-32 rounded-md" />
+              <Skeleton className="h-32 rounded-md" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Empty state - show onboarding

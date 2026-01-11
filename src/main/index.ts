@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createIPCHandler } from 'trpc-electron/main'
 import icon from '../../resources/icon.png?asset'
 import { appRouter } from './trpc/router'
+import { initDatabase } from './db'
 
 function createWindow(): BrowserWindow {
   // Create the browser window.
@@ -53,7 +54,10 @@ function createWindow(): BrowserWindow {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Initialize database first
+  await initDatabase()
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 

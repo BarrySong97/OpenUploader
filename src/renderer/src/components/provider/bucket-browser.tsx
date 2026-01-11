@@ -11,8 +11,7 @@ import {
   IconSearch,
   IconCheckbox
 } from '@tabler/icons-react'
-import type { Provider } from '@renderer/db'
-import { trpc } from '@renderer/lib/trpc'
+import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { Breadcrumb } from '@renderer/components/file-browser/breadcrumb'
 import { FileList } from '@renderer/components/file-browser/file-list'
 import { BatchToolbar } from '@renderer/components/file-browser/batch-toolbar'
@@ -47,7 +46,7 @@ import { cn } from '@/lib/utils'
 import type { FileItem } from '@/lib/types'
 
 interface BucketBrowserProps {
-  provider: Provider
+  provider: TRPCProvider
   bucket: string
   onBack: () => void
 }
@@ -177,16 +176,20 @@ export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) 
       setCursor(undefined)
       setCursorHistory([])
     } else {
-      // Single click on file - do nothing for now
-      console.log('File clicked:', file)
+      // Single click on file - open detail sheet
+      setSelectedFile(file)
+      setFileDetailOpen(true)
     }
   }
 
   const handleFileDoubleClick = (file: FileItem) => {
-    if (file.type === 'file') {
-      setSelectedFile(file)
-      setFileDetailOpen(true)
+    // Double click on folder also enters it (for consistency)
+    if (file.type === 'folder') {
+      setPath([...path, file.name])
+      setCursor(undefined)
+      setCursorHistory([])
     }
+    // Double click on file does nothing extra (already opened on single click)
   }
 
   const handleDownload = async (file: FileItem) => {
@@ -569,7 +572,7 @@ export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) 
 interface BatchMoveDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  provider: Provider
+  provider: TRPCProvider
   bucket: string
   selectedCount: number
   onConfirm: (destinationPrefix: string) => void

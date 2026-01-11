@@ -1,8 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { useLiveQuery } from '@tanstack/react-db'
 import { IconPlus, IconPencil, IconTrash, IconCloud } from '@tabler/icons-react'
-import { providersCollection, type Provider } from '@renderer/db'
 import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
 import { Button } from '@/components/ui/button'
 import {
@@ -15,31 +13,39 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
+import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export const Route = createFileRoute('/settings/providers')({
   component: ProvidersSettings
 })
 
 function ProvidersSettings() {
-  const { data: providers } = useLiveQuery((q) => q.from({ provider: providersCollection }))
+  const { data: providers, isLoading } = trpc.provider.list.useQuery()
+  const utils = trpc.useUtils()
+  const deleteMutation = trpc.provider.delete.useMutation({
+    onSuccess: () => {
+      utils.provider.list.invalidate()
+    }
+  })
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [providerToDelete, setProviderToDelete] = useState<Provider | null>(null)
+  const [providerToDelete, setProviderToDelete] = useState<TRPCProvider | null>(null)
 
-  const handleDeleteClick = (provider: Provider) => {
+  const handleDeleteClick = (provider: TRPCProvider) => {
     setProviderToDelete(provider)
     setDeleteDialogOpen(true)
   }
 
   const handleDeleteConfirm = () => {
     if (providerToDelete) {
-      providersCollection.delete(providerToDelete.id)
+      deleteMutation.mutate({ id: providerToDelete.id })
       setDeleteDialogOpen(false)
       setProviderToDelete(null)
     }
   }
 
-  const getProviderTypeLabel = (provider: Provider) => {
+  const getProviderTypeLabel = (provider: TRPCProvider) => {
     if (provider.type === 's3-compatible') {
       const labels: Record<string, string> = {
         'aws-s3': 'AWS S3',
@@ -69,7 +75,12 @@ function ProvidersSettings() {
         </Button>
       </div>
 
-      {!providers || providers.length === 0 ? (
+      {isLoading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-20 rounded-lg" />
+          <Skeleton className="h-20 rounded-lg" />
+        </div>
+      ) : !providers || providers.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 p-12 text-center">
           <p className="mb-4 text-muted-foreground">No providers configured</p>
           <Button onClick={() => setAddDialogOpen(true)}>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm, Controller } from 'react-hook-form'
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
 import {
   Dialog,
   DialogContent,
@@ -12,14 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage
-} from '@/components/ui/form'
+import { Field, FieldLabel, FieldError } from '@/components/ui/field'
 import {
   Select,
   SelectContent,
@@ -28,7 +21,6 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import {
-  providersCollection,
   addS3ProviderFormSchema,
   addSupabaseProviderFormSchema,
   s3Variants,
@@ -36,6 +28,7 @@ import {
   type AddS3ProviderForm,
   type AddSupabaseProviderForm
 } from '@renderer/db'
+import { trpc } from '@renderer/lib/trpc'
 
 interface AddProviderDialogProps {
   open: boolean
@@ -107,8 +100,21 @@ function S3ProviderForm({
   onSuccess: () => void
   defaultVariant?: S3Variant
 }) {
+  const utils = trpc.useUtils()
+  const createMutation = trpc.provider.create.useMutation({
+    onSuccess: () => {
+      utils.provider.list.invalidate()
+      form.reset()
+      onSuccess()
+    },
+    onError: (error) => {
+      console.error('Create S3 provider error:', error)
+    }
+  })
+
   const form = useForm<AddS3ProviderForm>({
-    resolver: zodResolver(addS3ProviderFormSchema),
+    resolver: standardSchemaResolver(addS3ProviderFormSchema),
+    mode: 'onSubmit',
     defaultValues: {
       name: '',
       type: 's3-compatible',
@@ -132,45 +138,45 @@ function S3ProviderForm({
   const selectedVariant = form.watch('variant')
 
   const onSubmit = (data: AddS3ProviderForm) => {
-    providersCollection.insert({
+    createMutation.mutate({
       id: crypto.randomUUID(),
-      ...data,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
+      ...data
     })
-    form.reset()
-    onSuccess()
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Name</FormLabel>
-              <FormControl>
-                <Input placeholder="My S3 Storage" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <Controller
+        name="name"
+        control={form.control}
+        render={({ field, fieldState }) => {
+          console.log(fieldState)
+          return (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={field.name}>Name</FieldLabel>
+              <Input
+                {...field}
+                id={field.name}
+                aria-invalid={fieldState.invalid}
+                placeholder="My S3 Storage"
+              />
+              {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+            </Field>
+          )
+        }}
+      />
 
-        <FormField
-          control={form.control}
-          name="variant"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Service</FormLabel>
+      <Controller
+        name="variant"
+        control={form.control}
+        render={({ field, fieldState }) => {
+          return (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={field.name}>Service</FieldLabel>
               <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a service" />
-                  </SelectTrigger>
-                </FormControl>
+                <SelectTrigger id={field.name} aria-invalid={fieldState.invalid}>
+                  <SelectValue placeholder="Select a service" />
+                </SelectTrigger>
                 <SelectContent>
                   {s3Variants.map((variant) => (
                     <SelectItem key={variant} value={variant}>
@@ -179,112 +185,146 @@ function S3ProviderForm({
                   ))}
                 </SelectContent>
               </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+              {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+            </Field>
+          )
+        }}
+      />
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="accessKeyId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Access Key ID</FormLabel>
-                <FormControl>
-                  <Input placeholder="AKIAIOSFODNN7EXAMPLE" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="secretAccessKey"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Secret Access Key</FormLabel>
-                <FormControl>
-                  <Input type="password" placeholder="••••••••" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        {selectedVariant === 'cloudflare-r2' && (
-          <FormField
-            control={form.control}
-            name="accountId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Account ID</FormLabel>
-                <FormControl>
-                  <Input placeholder="Your Cloudflare Account ID" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
-
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="region"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Region</FormLabel>
-                <FormControl>
-                  <Input placeholder="us-east-1" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="endpoint"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Endpoint (Optional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="https://s3.example.com" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <FormField
+      <div className="grid grid-cols-2 gap-4">
+        <Controller
+          name="accessKeyId"
           control={form.control}
-          name="bucket"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Default Bucket (Optional)</FormLabel>
-              <FormControl>
-                <Input placeholder="my-bucket" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={field.name}>Access Key ID</FieldLabel>
+              <Input
+                {...field}
+                id={field.name}
+                aria-invalid={fieldState.invalid}
+                placeholder="AKIAIOSFODNN7EXAMPLE"
+              />
+              {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+            </Field>
           )}
         />
 
-        <DialogFooter>
-          <Button type="submit">Add Provider</Button>
-        </DialogFooter>
-      </form>
-    </Form>
+        <Controller
+          name="secretAccessKey"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={field.name}>Secret Access Key</FieldLabel>
+              <Input
+                {...field}
+                id={field.name}
+                type="password"
+                aria-invalid={fieldState.invalid}
+                placeholder="••••••••"
+              />
+              {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+            </Field>
+          )}
+        />
+      </div>
+
+      {selectedVariant === 'cloudflare-r2' && (
+        <Controller
+          name="accountId"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={field.name}>Account ID</FieldLabel>
+              <Input
+                {...field}
+                id={field.name}
+                aria-invalid={fieldState.invalid}
+                placeholder="Your Cloudflare Account ID"
+              />
+              {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+            </Field>
+          )}
+        />
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
+        <Controller
+          name="region"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={field.name}>Region</FieldLabel>
+              <Input
+                {...field}
+                id={field.name}
+                aria-invalid={fieldState.invalid}
+                placeholder="us-east-1"
+              />
+              {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+            </Field>
+          )}
+        />
+
+        <Controller
+          name="endpoint"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={field.name}>Endpoint (Optional)</FieldLabel>
+              <Input
+                {...field}
+                id={field.name}
+                aria-invalid={fieldState.invalid}
+                placeholder="https://s3.example.com"
+              />
+              {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+            </Field>
+          )}
+        />
+      </div>
+
+      <Controller
+        name="bucket"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor={field.name}>Default Bucket (Optional)</FieldLabel>
+            <Input
+              {...field}
+              id={field.name}
+              aria-invalid={fieldState.invalid}
+              placeholder="my-bucket"
+            />
+            {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+          </Field>
+        )}
+      />
+
+      <DialogFooter>
+        <Button type="submit" disabled={createMutation.isPending}>
+          {createMutation.isPending ? 'Adding...' : 'Add Provider'}
+        </Button>
+      </DialogFooter>
+    </form>
   )
 }
 
 function SupabaseProviderForm({ onSuccess }: { onSuccess: () => void }) {
+  const utils = trpc.useUtils()
+  const createMutation = trpc.provider.create.useMutation({
+    onSuccess: () => {
+      utils.provider.list.invalidate()
+      form.reset()
+      onSuccess()
+    },
+    onError: (error) => {
+      console.error('Create Supabase provider error:', error)
+    }
+  })
+
   const form = useForm<AddSupabaseProviderForm>({
-    resolver: zodResolver(addSupabaseProviderFormSchema),
+    resolver: standardSchemaResolver(addSupabaseProviderFormSchema),
+    mode: 'onSubmit',
     defaultValues: {
       name: '',
       type: 'supabase-storage',
@@ -296,93 +336,106 @@ function SupabaseProviderForm({ onSuccess }: { onSuccess: () => void }) {
   })
 
   const onSubmit = (data: AddSupabaseProviderForm) => {
-    providersCollection.insert({
+    createMutation.mutate({
       id: crypto.randomUUID(),
-      ...data,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
+      ...data
     })
-    form.reset()
-    onSuccess()
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Name</FormLabel>
-              <FormControl>
-                <Input placeholder="My Supabase Storage" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <Controller
+        name="name"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor={field.name}>Name</FieldLabel>
+            <Input
+              {...field}
+              id={field.name}
+              aria-invalid={fieldState.invalid}
+              placeholder="My Supabase Storage"
+            />
+            {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+          </Field>
+        )}
+      />
 
-        <FormField
-          control={form.control}
-          name="projectUrl"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Project URL</FormLabel>
-              <FormControl>
-                <Input placeholder="https://xxx.supabase.co" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      <Controller
+        name="projectUrl"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor={field.name}>Project URL</FieldLabel>
+            <Input
+              {...field}
+              id={field.name}
+              aria-invalid={fieldState.invalid}
+              placeholder="https://xxx.supabase.co"
+            />
+            {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+          </Field>
+        )}
+      />
 
-        <FormField
-          control={form.control}
-          name="anonKey"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Anon Key (Optional)</FormLabel>
-              <FormControl>
-                <Input type="password" placeholder="••••••••" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      <Controller
+        name="anonKey"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor={field.name}>Anon Key (Optional)</FieldLabel>
+            <Input
+              {...field}
+              id={field.name}
+              type="password"
+              aria-invalid={fieldState.invalid}
+              placeholder="••••••••"
+            />
+            {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+          </Field>
+        )}
+      />
 
-        <FormField
-          control={form.control}
-          name="serviceRoleKey"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Service Role Key (Optional)</FormLabel>
-              <FormControl>
-                <Input type="password" placeholder="••••••••" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      <Controller
+        name="serviceRoleKey"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor={field.name}>Service Role Key (Optional)</FieldLabel>
+            <Input
+              {...field}
+              id={field.name}
+              type="password"
+              aria-invalid={fieldState.invalid}
+              placeholder="••••••••"
+            />
+            {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+          </Field>
+        )}
+      />
 
-        <FormField
-          control={form.control}
-          name="bucket"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Default Bucket (Optional)</FormLabel>
-              <FormControl>
-                <Input placeholder="my-bucket" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      <Controller
+        name="bucket"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor={field.name}>Default Bucket (Optional)</FieldLabel>
+            <Input
+              {...field}
+              id={field.name}
+              aria-invalid={fieldState.invalid}
+              placeholder="my-bucket"
+            />
+            {fieldState.error?.message && <FieldError>{fieldState.error.message}</FieldError>}
+          </Field>
+        )}
+      />
 
-        <DialogFooter>
-          <Button type="submit">Add Provider</Button>
-        </DialogFooter>
-      </form>
-    </Form>
+      <DialogFooter>
+        <Button type="submit" disabled={createMutation.isPending}>
+          {createMutation.isPending ? 'Adding...' : 'Add Provider'}
+        </Button>
+      </DialogFooter>
+    </form>
   )
 }

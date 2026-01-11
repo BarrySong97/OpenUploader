@@ -1,4 +1,4 @@
-import type { Provider } from '@renderer/db'
+import type { TRPCProvider } from '@renderer/lib/trpc'
 import { trpc } from '@renderer/lib/trpc'
 
 export interface ProviderStats {
@@ -13,7 +13,7 @@ export interface ProviderStatus {
   stats?: ProviderStats
 }
 
-export function useProviderStatus(provider: Provider) {
+export function useProviderStatus(provider: TRPCProvider) {
   const connectionQuery = trpc.provider.testConnection.useQuery(provider, {
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000 // 5 minutes

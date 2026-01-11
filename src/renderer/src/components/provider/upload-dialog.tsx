@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { IconUpload, IconX, IconFile, IconLoader2, IconPhoto } from '@tabler/icons-react'
-import type { Provider } from '@renderer/db'
-import { trpc } from '@renderer/lib/trpc'
+import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { UploadZone } from '@renderer/components/upload/upload-zone'
 import {
   Dialog,
@@ -28,7 +27,7 @@ const PRESET_LABELS: Record<CompressionPreset, string> = {
 interface UploadDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  provider: Provider
+  provider: TRPCProvider
   bucket: string
   prefix?: string
   onSuccess?: () => void

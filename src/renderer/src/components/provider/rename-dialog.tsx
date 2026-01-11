@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { IconPencil, IconLoader2 } from '@tabler/icons-react'
-import type { Provider } from '@renderer/db'
 import type { FileItem } from '@/lib/types'
-import { trpc } from '@renderer/lib/trpc'
+import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import {
   Dialog,
   DialogContent,
@@ -18,7 +17,7 @@ import { Label } from '@/components/ui/label'
 interface RenameDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  provider: Provider
+  provider: TRPCProvider
   bucket: string
   file: FileItem | null
   onSuccess?: () => void

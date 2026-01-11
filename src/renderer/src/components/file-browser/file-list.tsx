@@ -156,7 +156,7 @@ export function FileList({
                   'border-b border-border transition-colors hover:bg-muted/50 cursor-pointer',
                   isSelected && 'bg-primary/5'
                 )}
-                onDoubleClick={() => onFileDoubleClick?.(file)}
+                onClick={(e) => handleRowClick(file, e)}
                 draggable={draggable}
                 onDragStart={(e) => handleDragStart(e, file)}
                 onDragOver={(e) => handleDragOver(e, file)}
@@ -172,13 +172,10 @@ export function FileList({
                   </td>
                 )}
                 <td className="px-6 py-2">
-                  <button
-                    onClick={(e) => handleRowClick(file, e)}
-                    className="flex items-center gap-3 text-left"
-                  >
+                  <div className="flex items-center gap-3 text-left">
                     {getFileIcon(file, 'small')}
                     <span className="font-medium text-sm">{file.name}</span>
-                  </button>
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-muted-foreground">
                   {file.type === 'folder' ? '-' : formatFileSize(file.size || 0)}

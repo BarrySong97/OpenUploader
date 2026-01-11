@@ -1,6 +1,19 @@
-import { z } from 'zod'
 import { publicProcedure, router } from '../trpc'
-import { providerSchema } from '../../../shared/schema/provider'
+import { z } from 'zod'
+import { addProviderFormSchema, providerSchema } from '../../../shared/schema/provider'
+import {
+  getProviderByIdInputSchema,
+  deleteProviderInputSchema,
+  listObjectsInputSchema,
+  uploadFileInputSchema,
+  createFolderInputSchema,
+  getObjectUrlInputSchema,
+  deleteObjectInputSchema,
+  deleteObjectsInputSchema,
+  renameObjectInputSchema,
+  moveObjectInputSchema,
+  moveObjectsInputSchema
+} from '../../../shared/schema/trpc/provider'
 import {
   testConnection,
   getProviderStats,
@@ -14,71 +27,29 @@ import {
   moveObject,
   moveObjects
 } from '../../services/provider-service'
-
-const listObjectsInputSchema = z.object({
-  provider: providerSchema,
-  bucket: z.string(),
-  prefix: z.string().optional(),
-  cursor: z.string().optional(),
-  maxKeys: z.number().optional()
-})
-
-const uploadFileInputSchema = z.object({
-  provider: providerSchema,
-  bucket: z.string(),
-  key: z.string(),
-  content: z.string(),
-  contentType: z.string().optional()
-})
-
-const createFolderInputSchema = z.object({
-  provider: providerSchema,
-  bucket: z.string(),
-  path: z.string()
-})
-
-const getObjectUrlInputSchema = z.object({
-  provider: providerSchema,
-  bucket: z.string(),
-  key: z.string(),
-  expiresIn: z.number().optional()
-})
-
-const deleteObjectInputSchema = z.object({
-  provider: providerSchema,
-  bucket: z.string(),
-  key: z.string(),
-  isFolder: z.boolean().optional()
-})
-
-const deleteObjectsInputSchema = z.object({
-  provider: providerSchema,
-  bucket: z.string(),
-  keys: z.array(z.string())
-})
-
-const renameObjectInputSchema = z.object({
-  provider: providerSchema,
-  bucket: z.string(),
-  sourceKey: z.string(),
-  newName: z.string()
-})
-
-const moveObjectInputSchema = z.object({
-  provider: providerSchema,
-  bucket: z.string(),
-  sourceKey: z.string(),
-  destinationPrefix: z.string()
-})
-
-const moveObjectsInputSchema = z.object({
-  provider: providerSchema,
-  bucket: z.string(),
-  sourceKeys: z.array(z.string()),
-  destinationPrefix: z.string()
-})
+import { providerRepository } from '../../db/provider-repository'
 
 export const providerRouter = router({
+  // ============ Provider CRUD Operations ============
+  list: publicProcedure.query(async () => {
+    return providerRepository.findAll()
+  }),
+
+  getById: publicProcedure.input(getProviderByIdInputSchema).query(async ({ input }) => {
+    return providerRepository.findById(input.id)
+  }),
+
+  create: publicProcedure
+    .input(addProviderFormSchema.and(z.object({ id: z.string() })))
+    .mutation(async ({ input }) => {
+      return providerRepository.create(input)
+    }),
+
+  delete: publicProcedure.input(deleteProviderInputSchema).mutation(async ({ input }) => {
+    return providerRepository.delete(input.id)
+  }),
+
+  // ============ Provider Operations ============
   testConnection: publicProcedure.input(providerSchema).query(async ({ input }) => {
     return testConnection(input)
   }),

@@ -1,4 +1,4 @@
-export { providersCollection } from './collections/providers'
+// Re-export types and schemas from shared
 export type {
   Provider,
   S3Provider,
@@ -7,11 +7,11 @@ export type {
   AddS3ProviderForm,
   AddSupabaseProviderForm,
   AddProviderForm
-} from './schema/provider'
+} from '../../../shared/schema/provider'
 export {
   providerSchema,
   s3Variants,
   addS3ProviderFormSchema,
   addSupabaseProviderFormSchema,
   addProviderFormSchema
-} from './schema/provider'
+} from '../../../shared/schema/provider'

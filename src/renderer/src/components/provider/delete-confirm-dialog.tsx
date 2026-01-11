@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { IconTrash, IconLoader2, IconAlertTriangle } from '@tabler/icons-react'
-import type { Provider } from '@renderer/db'
 import type { FileItem } from '@/lib/types'
-import { trpc } from '@renderer/lib/trpc'
+import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -17,7 +16,7 @@ import {
 interface DeleteConfirmDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  provider: Provider
+  provider: TRPCProvider
   bucket: string
   file: FileItem | null
   onSuccess?: () => void
