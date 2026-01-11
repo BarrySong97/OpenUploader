@@ -1,4 +1,13 @@
-import { S3Client, ListBucketsCommand, ListObjectsV2Command, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import {
+  S3Client,
+  ListBucketsCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  CopyObjectCommand
+} from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { createClient } from '@supabase/supabase-js'
 import type { Provider, S3Provider, SupabaseProvider } from '../../shared/schema/provider'
@@ -559,5 +568,450 @@ export async function getObjectUrl(input: GetObjectUrlInput): Promise<GetObjectU
     return getS3ObjectUrl(provider, bucket, key, expiresIn)
   } else {
     return getSupabaseObjectUrl(provider, bucket, key, expiresIn)
+  }
+}
+
+// ============ Delete Object ============
+
+export interface DeleteObjectInput {
+  provider: Provider
+  bucket: string
+  key: string
+  isFolder?: boolean
+}
+
+export interface DeleteResult {
+  success: boolean
+  error?: string
+  deletedCount?: number
+}
+
+async function deleteS3Object(
+  provider: S3Provider,
+  bucket: string,
+  key: string,
+  isFolder?: boolean
+): Promise<DeleteResult> {
+  try {
+    const client = createS3Client(provider)
+
+    if (isFolder) {
+      // For folders, we need to delete all objects with this prefix
+      const keysToDelete: string[] = []
+      let continuationToken: string | undefined
+
+      // List all objects with this prefix
+      do {
+        const listResponse = await client.send(
+          new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: key,
+            ContinuationToken: continuationToken
+          })
+        )
+
+        if (listResponse.Contents) {
+          for (const obj of listResponse.Contents) {
+            if (obj.Key) {
+              keysToDelete.push(obj.Key)
+            }
+          }
+        }
+
+        continuationToken = listResponse.NextContinuationToken
+      } while (continuationToken)
+
+      if (keysToDelete.length === 0) {
+        return { success: true, deletedCount: 0 }
+      }
+
+      // Delete in batches of 1000 (S3 limit)
+      let deletedCount = 0
+      for (let i = 0; i < keysToDelete.length; i += 1000) {
+        const batch = keysToDelete.slice(i, i + 1000)
+        await client.send(
+          new DeleteObjectsCommand({
+            Bucket: bucket,
+            Delete: {
+              Objects: batch.map((k) => ({ Key: k }))
+            }
+          })
+        )
+        deletedCount += batch.length
+      }
+
+      return { success: true, deletedCount }
+    } else {
+      // Single file delete
+      await client.send(
+        new DeleteObjectCommand({
+          Bucket: bucket,
+          Key: key
+        })
+      )
+      return { success: true, deletedCount: 1 }
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+async function deleteSupabaseObject(
+  provider: SupabaseProvider,
+  bucket: string,
+  key: string,
+  isFolder?: boolean
+): Promise<DeleteResult> {
+  try {
+    const supabase = createClient(
+      provider.projectUrl,
+      provider.serviceRoleKey || provider.anonKey || ''
+    )
+
+    if (isFolder) {
+      // List all files in the folder
+      const { data: files, error: listError } = await supabase.storage.from(bucket).list(key)
+
+      if (listError) {
+        return { success: false, error: listError.message }
+      }
+
+      if (!files || files.length === 0) {
+        return { success: true, deletedCount: 0 }
+      }
+
+      // Build full paths for deletion
+      const paths = files.map((f) => `${key}${f.name}`)
+
+      const { error } = await supabase.storage.from(bucket).remove(paths)
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      return { success: true, deletedCount: paths.length }
+    } else {
+      const { error } = await supabase.storage.from(bucket).remove([key])
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      return { success: true, deletedCount: 1 }
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+export async function deleteObject(input: DeleteObjectInput): Promise<DeleteResult> {
+  const { provider, bucket, key, isFolder } = input
+
+  if (provider.type === 's3-compatible') {
+    return deleteS3Object(provider, bucket, key, isFolder)
+  } else {
+    return deleteSupabaseObject(provider, bucket, key, isFolder)
+  }
+}
+
+// ============ Delete Multiple Objects ============
+
+export interface DeleteObjectsInput {
+  provider: Provider
+  bucket: string
+  keys: string[]
+}
+
+async function deleteS3Objects(
+  provider: S3Provider,
+  bucket: string,
+  keys: string[]
+): Promise<DeleteResult> {
+  try {
+    const client = createS3Client(provider)
+
+    // Delete in batches of 1000 (S3 limit)
+    let deletedCount = 0
+    for (let i = 0; i < keys.length; i += 1000) {
+      const batch = keys.slice(i, i + 1000)
+      await client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: {
+            Objects: batch.map((k) => ({ Key: k }))
+          }
+        })
+      )
+      deletedCount += batch.length
+    }
+
+    return { success: true, deletedCount }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+async function deleteSupabaseObjects(
+  provider: SupabaseProvider,
+  bucket: string,
+  keys: string[]
+): Promise<DeleteResult> {
+  try {
+    const supabase = createClient(
+      provider.projectUrl,
+      provider.serviceRoleKey || provider.anonKey || ''
+    )
+
+    const { error } = await supabase.storage.from(bucket).remove(keys)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, deletedCount: keys.length }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+export async function deleteObjects(input: DeleteObjectsInput): Promise<DeleteResult> {
+  const { provider, bucket, keys } = input
+
+  if (provider.type === 's3-compatible') {
+    return deleteS3Objects(provider, bucket, keys)
+  } else {
+    return deleteSupabaseObjects(provider, bucket, keys)
+  }
+}
+
+// ============ Rename Object ============
+
+export interface RenameObjectInput {
+  provider: Provider
+  bucket: string
+  sourceKey: string
+  newName: string
+}
+
+export interface RenameResult {
+  success: boolean
+  error?: string
+  newKey?: string
+}
+
+async function renameS3Object(
+  provider: S3Provider,
+  bucket: string,
+  sourceKey: string,
+  newName: string
+): Promise<RenameResult> {
+  try {
+    const client = createS3Client(provider)
+
+    // Calculate new key by replacing filename in path
+    const pathParts = sourceKey.split('/')
+    pathParts[pathParts.length - 1] = newName
+    const destinationKey = pathParts.join('/')
+
+    // Copy to new location
+    await client.send(
+      new CopyObjectCommand({
+        Bucket: bucket,
+        CopySource: encodeURIComponent(`${bucket}/${sourceKey}`),
+        Key: destinationKey
+      })
+    )
+
+    // Delete original
+    await client.send(
+      new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: sourceKey
+      })
+    )
+
+    return { success: true, newKey: destinationKey }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+async function renameSupabaseObject(
+  provider: SupabaseProvider,
+  bucket: string,
+  sourceKey: string,
+  newName: string
+): Promise<RenameResult> {
+  try {
+    const supabase = createClient(
+      provider.projectUrl,
+      provider.serviceRoleKey || provider.anonKey || ''
+    )
+
+    // Calculate new key
+    const pathParts = sourceKey.split('/')
+    pathParts[pathParts.length - 1] = newName
+    const destinationKey = pathParts.join('/')
+
+    const { error } = await supabase.storage.from(bucket).move(sourceKey, destinationKey)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, newKey: destinationKey }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+export async function renameObject(input: RenameObjectInput): Promise<RenameResult> {
+  const { provider, bucket, sourceKey, newName } = input
+
+  if (provider.type === 's3-compatible') {
+    return renameS3Object(provider, bucket, sourceKey, newName)
+  } else {
+    return renameSupabaseObject(provider, bucket, sourceKey, newName)
+  }
+}
+
+// ============ Move Object ============
+
+export interface MoveObjectInput {
+  provider: Provider
+  bucket: string
+  sourceKey: string
+  destinationPrefix: string
+}
+
+export interface MoveResult {
+  success: boolean
+  error?: string
+  newKey?: string
+}
+
+async function moveS3Object(
+  provider: S3Provider,
+  bucket: string,
+  sourceKey: string,
+  destinationPrefix: string
+): Promise<MoveResult> {
+  try {
+    const client = createS3Client(provider)
+
+    // Get filename from source key
+    const fileName = sourceKey.split('/').pop() || ''
+    const destinationKey = destinationPrefix ? `${destinationPrefix}${fileName}` : fileName
+
+    // Copy to new location
+    await client.send(
+      new CopyObjectCommand({
+        Bucket: bucket,
+        CopySource: encodeURIComponent(`${bucket}/${sourceKey}`),
+        Key: destinationKey
+      })
+    )
+
+    // Delete original
+    await client.send(
+      new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: sourceKey
+      })
+    )
+
+    return { success: true, newKey: destinationKey }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+async function moveSupabaseObject(
+  provider: SupabaseProvider,
+  bucket: string,
+  sourceKey: string,
+  destinationPrefix: string
+): Promise<MoveResult> {
+  try {
+    const supabase = createClient(
+      provider.projectUrl,
+      provider.serviceRoleKey || provider.anonKey || ''
+    )
+
+    // Get filename from source key
+    const fileName = sourceKey.split('/').pop() || ''
+    const destinationKey = destinationPrefix ? `${destinationPrefix}${fileName}` : fileName
+
+    const { error } = await supabase.storage.from(bucket).move(sourceKey, destinationKey)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, newKey: destinationKey }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+export async function moveObject(input: MoveObjectInput): Promise<MoveResult> {
+  const { provider, bucket, sourceKey, destinationPrefix } = input
+
+  if (provider.type === 's3-compatible') {
+    return moveS3Object(provider, bucket, sourceKey, destinationPrefix)
+  } else {
+    return moveSupabaseObject(provider, bucket, sourceKey, destinationPrefix)
+  }
+}
+
+// ============ Move Multiple Objects ============
+
+export interface MoveObjectsInput {
+  provider: Provider
+  bucket: string
+  sourceKeys: string[]
+  destinationPrefix: string
+}
+
+export async function moveObjects(input: MoveObjectsInput): Promise<MoveResult> {
+  const { provider, bucket, sourceKeys, destinationPrefix } = input
+
+  try {
+    for (const sourceKey of sourceKeys) {
+      const result = await moveObject({ provider, bucket, sourceKey, destinationPrefix })
+      if (!result.success) {
+        return result
+      }
+    }
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
   }
 }

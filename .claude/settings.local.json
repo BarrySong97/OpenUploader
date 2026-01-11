@@ -18,7 +18,9 @@
       "WebFetch(domain:trpc.io)",
       "Bash(pnpm dlx:*)",
       "Bash(findstr:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(pnpm approve-builds:*)",
+      "Bash(pnpm rebuild:*)"
     ]
   }
 }

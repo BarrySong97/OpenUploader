@@ -7,7 +7,12 @@ import {
   listObjects,
   uploadFile,
   createFolder,
-  getObjectUrl
+  getObjectUrl,
+  deleteObject,
+  deleteObjects,
+  renameObject,
+  moveObject,
+  moveObjects
 } from '../../services/provider-service'
 
 const listObjectsInputSchema = z.object({
@@ -39,6 +44,40 @@ const getObjectUrlInputSchema = z.object({
   expiresIn: z.number().optional()
 })
 
+const deleteObjectInputSchema = z.object({
+  provider: providerSchema,
+  bucket: z.string(),
+  key: z.string(),
+  isFolder: z.boolean().optional()
+})
+
+const deleteObjectsInputSchema = z.object({
+  provider: providerSchema,
+  bucket: z.string(),
+  keys: z.array(z.string())
+})
+
+const renameObjectInputSchema = z.object({
+  provider: providerSchema,
+  bucket: z.string(),
+  sourceKey: z.string(),
+  newName: z.string()
+})
+
+const moveObjectInputSchema = z.object({
+  provider: providerSchema,
+  bucket: z.string(),
+  sourceKey: z.string(),
+  destinationPrefix: z.string()
+})
+
+const moveObjectsInputSchema = z.object({
+  provider: providerSchema,
+  bucket: z.string(),
+  sourceKeys: z.array(z.string()),
+  destinationPrefix: z.string()
+})
+
 export const providerRouter = router({
   testConnection: publicProcedure.input(providerSchema).query(async ({ input }) => {
     return testConnection(input)
@@ -62,5 +101,25 @@ export const providerRouter = router({
 
   getObjectUrl: publicProcedure.input(getObjectUrlInputSchema).query(async ({ input }) => {
     return getObjectUrl(input)
+  }),
+
+  deleteObject: publicProcedure.input(deleteObjectInputSchema).mutation(async ({ input }) => {
+    return deleteObject(input)
+  }),
+
+  deleteObjects: publicProcedure.input(deleteObjectsInputSchema).mutation(async ({ input }) => {
+    return deleteObjects(input)
+  }),
+
+  renameObject: publicProcedure.input(renameObjectInputSchema).mutation(async ({ input }) => {
+    return renameObject(input)
+  }),
+
+  moveObject: publicProcedure.input(moveObjectInputSchema).mutation(async ({ input }) => {
+    return moveObject(input)
+  }),
+
+  moveObjects: publicProcedure.input(moveObjectsInputSchema).mutation(async ({ input }) => {
+    return moveObjects(input)
   })
 })
