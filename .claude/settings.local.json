@@ -20,7 +20,8 @@
       "Bash(findstr:*)",
       "Bash(find:*)",
       "Bash(pnpm approve-builds:*)",
-      "Bash(pnpm rebuild:*)"
+      "Bash(pnpm rebuild:*)",
+      "Bash(pnpm typecheck:web:*)"
     ]
   }
 }
