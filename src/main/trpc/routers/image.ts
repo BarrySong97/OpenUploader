@@ -1,23 +1,11 @@
 import { z } from 'zod'
 import { publicProcedure, router } from '../trpc'
-import {
-  compressImage,
-  getImageInfo,
-  COMPRESSION_PRESETS,
-  type CompressionPreset
-} from '@main/services/image-service'
-
-const compressionPresetSchema = z.enum([
-  'thumbnail',
-  'preview',
-  'standard',
-  'hd',
-  'original'
-]) as z.ZodType<CompressionPreset>
+import { compressImage, getImageInfo } from '@main/services/image-service'
+import { getAllPresets } from '@main/services/preset-service'
 
 const compressImageInputSchema = z.object({
   content: z.string(), // Base64 encoded
-  preset: compressionPresetSchema,
+  preset: z.string(), // Preset ID (can be built-in or custom)
   filename: z.string().optional()
 })
 
@@ -34,7 +22,7 @@ export const imageRouter = router({
     return getImageInfo(input.content)
   }),
 
-  getPresets: publicProcedure.query(() => {
-    return COMPRESSION_PRESETS
+  getPresets: publicProcedure.query(async () => {
+    return getAllPresets()
   })
 })

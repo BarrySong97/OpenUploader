@@ -1,5 +1,4 @@
-import { pgTable, text, timestamp, pgEnum, jsonb } from 'drizzle-orm/pg-core'
-import type { ImageCompressionSettings } from '@shared/schema/settings'
+import { pgTable, text, timestamp, pgEnum, integer } from 'drizzle-orm/pg-core'
 
 // S3 Provider variants
 export const s3VariantEnum = pgEnum('s3_variant', [
@@ -44,13 +43,18 @@ export const providers = pgTable('providers', {
 export type ProviderRecord = typeof providers.$inferSelect
 export type NewProviderRecord = typeof providers.$inferInsert
 
-// Settings table
-export const settings = pgTable('settings', {
-  id: text('id').primaryKey().default('default'),
-  imageCompression: jsonb('image_compression').$type<ImageCompressionSettings>(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+// Compression presets table
+export const compressionPresets = pgTable('compression_presets', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  maxWidth: integer('max_width').notNull(),
+  maxHeight: integer('max_height').notNull(),
+  quality: integer('quality').notNull(),
+  format: text('format').notNull(), // 'webp' | 'jpeg' | 'png' | 'original'
+  fit: text('fit').notNull(), // 'cover' | 'contain' | 'fill' | 'inside' | 'outside'
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 })
 
-export type SettingsRecord = typeof settings.$inferSelect
-export type NewSettingsRecord = typeof settings.$inferInsert
+export type CompressionPresetRecord = typeof compressionPresets.$inferSelect
+export type NewCompressionPresetRecord = typeof compressionPresets.$inferInsert

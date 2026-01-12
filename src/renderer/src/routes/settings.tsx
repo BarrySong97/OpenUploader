@@ -20,17 +20,6 @@ function SettingsLayout() {
 
   return (
     <PageLayout>
-      <div className="mb-8">
-        <Link to="/">
-          <Button variant="ghost" size="default" className="mb-4">
-            <IconArrowLeft size={16} className="mr-2" />
-            Back to Dashboard
-          </Button>
-        </Link>
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="mt-2 text-muted-foreground">Manage your application settings and providers</p>
-      </div>
-
       <div className="flex gap-8">
         {/* Sidebar Navigation */}
         <nav className="w-48 shrink-0">

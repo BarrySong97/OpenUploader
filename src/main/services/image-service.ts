@@ -1,5 +1,6 @@
 import sharp from 'sharp'
 import type { CompressionPreset, FitMode } from '@shared/schema/settings'
+import { getPresetById } from './preset-service'
 
 // ============ Types ============
 
@@ -59,7 +60,7 @@ export const COMPRESSION_PRESETS: Record<CompressionPreset, CompressionConfig> =
 
 export interface CompressImageInput {
   content: string // Base64 encoded
-  preset: CompressionPreset
+  preset: string // Preset ID (can be built-in or custom)
   filename?: string
   fit?: FitMode
 }
@@ -97,11 +98,35 @@ export async function getImageInfo(content: string): Promise<ImageInfo> {
 }
 
 export async function compressImage(input: CompressImageInput): Promise<CompressImageResult> {
-  const { content, preset } = input
-  const config = COMPRESSION_PRESETS[preset]
+  const { content, preset: presetId } = input
+
+  // Try to get preset from database first
+  let config: CompressionConfig | null = null
+  const dbPreset = await getPresetById(presetId)
+
+  if (dbPreset) {
+    // Use preset from database
+    config = {
+      preset: presetId as CompressionPreset,
+      maxWidth: dbPreset.maxWidth,
+      maxHeight: dbPreset.maxHeight,
+      quality: dbPreset.quality,
+      format: dbPreset.format as CompressionConfig['format'],
+      fit: dbPreset.fit
+    }
+  } else if (presetId in COMPRESSION_PRESETS) {
+    // Fallback to hardcoded preset
+    config = COMPRESSION_PRESETS[presetId as CompressionPreset]
+  } else {
+    return {
+      success: false,
+      originalSize: Buffer.from(content, 'base64').length,
+      error: `Preset '${presetId}' not found`
+    }
+  }
 
   // If original preset, return as-is
-  if (preset === 'original') {
+  if (presetId === 'original' || (config.maxWidth >= 999999 && config.quality === 100)) {
     const buffer = Buffer.from(content, 'base64')
     return {
       success: true,
@@ -205,14 +230,19 @@ export function isCompressibleImage(mimeType: string): boolean {
   return compressibleTypes.includes(mimeType.toLowerCase())
 }
 
-export function getOutputMimeType(preset: CompressionPreset, originalMimeType: string): string {
-  const config = COMPRESSION_PRESETS[preset]
+export async function getOutputMimeType(
+  presetId: string,
+  originalMimeType: string
+): Promise<string> {
+  // Try to get preset from database first
+  const dbPreset = await getPresetById(presetId)
+  const format = dbPreset?.format || COMPRESSION_PRESETS[presetId as CompressionPreset]?.format
 
-  if (config.format === 'original') {
+  if (!format || format === 'original') {
     return originalMimeType
   }
 
-  switch (config.format) {
+  switch (format) {
     case 'webp':
       return 'image/webp'
     case 'jpeg':
@@ -224,10 +254,15 @@ export function getOutputMimeType(preset: CompressionPreset, originalMimeType: s
   }
 }
 
-export function getOutputExtension(preset: CompressionPreset, originalFilename: string): string {
-  const config = COMPRESSION_PRESETS[preset]
+export async function getOutputExtension(
+  presetId: string,
+  originalFilename: string
+): Promise<string> {
+  // Try to get preset from database first
+  const dbPreset = await getPresetById(presetId)
+  const format = dbPreset?.format || COMPRESSION_PRESETS[presetId as CompressionPreset]?.format
 
-  if (config.format === 'original') {
+  if (!format || format === 'original') {
     return originalFilename
   }
 
@@ -235,7 +270,7 @@ export function getOutputExtension(preset: CompressionPreset, originalFilename: 
   const lastDotIndex = originalFilename.lastIndexOf('.')
   const baseName = lastDotIndex > 0 ? originalFilename.substring(0, lastDotIndex) : originalFilename
 
-  switch (config.format) {
+  switch (format) {
     case 'webp':
       return `${baseName}.webp`
     case 'jpeg':

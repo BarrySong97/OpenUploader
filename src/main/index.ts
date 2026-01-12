@@ -5,6 +5,7 @@ import { createIPCHandler } from 'trpc-electron/main'
 import icon from '../../resources/icon.png?asset'
 import { appRouter } from './trpc/router'
 import { initDatabase } from './db'
+import { initializeBuiltInPresets } from './services/preset-service'
 
 function createWindow(): BrowserWindow {
   // Create the browser window.
@@ -57,6 +58,9 @@ function createWindow(): BrowserWindow {
 app.whenReady().then(async () => {
   // Initialize database first
   await initDatabase()
+
+  // Initialize built-in presets
+  await initializeBuiltInPresets()
 
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')

@@ -25,7 +25,9 @@
       "WebFetch(domain:orm.drizzle.team)",
       "Bash(node:*)",
       "Bash(npm info:*)",
-      "Bash(pnpm db:generate:*)"
+      "Bash(pnpm db:generate:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(pnpm tsc:*)"
     ]
   }
 }

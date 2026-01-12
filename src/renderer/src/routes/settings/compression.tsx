@@ -1,16 +1,9 @@
-import { useEffect, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import { useForm, Controller } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { IconPhoto, IconCheck } from '@tabler/icons-react'
+import { useState } from 'react'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { IconPhoto, IconSettings, IconEdit } from '@tabler/icons-react'
 import { trpc } from '@renderer/lib/trpc'
-import {
-  imageCompressionSettingsSchema,
-  fitModes,
-  compressionPresets
-} from '@shared/schema/settings'
-import type { ImageCompressionSettings } from '@shared/schema/settings'
-import { Field, FieldLabel, FieldError } from '@/components/ui/field'
+import { fitModes } from '@shared/schema/settings'
+import type { CreatePresetInput } from '@shared/schema/settings'
 import {
   Select,
   SelectTrigger,
@@ -21,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PresetDialog } from '@/components/preset-dialog'
 
 export const Route = createFileRoute('/settings/compression')({
   component: CompressionSettings
@@ -34,56 +28,56 @@ const fitModeDescriptions: Record<string, string> = {
   outside: 'Fit outside, may crop'
 }
 
-const presetDescriptions: Record<string, string> = {
-  thumbnail: 'Small preview (200x200, 60% quality, cover fit)',
-  preview: 'Medium preview (800x800, 75% quality, inside fit)',
-  standard: 'Standard quality (1920x1920, 85% quality, inside fit)',
-  hd: 'High definition (4096x4096, 90% quality, inside fit)',
-  original: 'Original size and quality (no compression)'
-}
-
 function CompressionSettings() {
-  const { data: settings, isLoading } = trpc.settings.get.useQuery()
-  const { data: presets } = trpc.image.getPresets.useQuery()
-  const updateMutation = trpc.settings.updateImageCompression.useMutation()
-  const [showSuccess, setShowSuccess] = useState(false)
-
-  const form = useForm<ImageCompressionSettings>({
-    resolver: zodResolver(imageCompressionSettingsSchema),
-    defaultValues: {
-      quality: 85,
-      fit: 'inside',
-      preset: 'standard'
+  const { data: presets, isLoading } = trpc.preset.list.useQuery()
+  const utils = trpc.useUtils()
+  const updateMutation = trpc.preset.update.useMutation({
+    onSuccess: () => {
+      utils.preset.list.invalidate()
     }
   })
 
-  // Update form when settings are loaded
-  useEffect(() => {
-    if (settings?.imageCompression) {
-      form.reset(settings.imageCompression)
+  // Currently selected preset ID
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('standard')
+
+  // Edit dialog state
+  const [dialogOpen, setDialogOpen] = useState(false)
+
+  // Get selected preset data
+  const selectedPreset = presets?.find((p) => p.id === selectedPresetId)
+
+  // Handle preset selection change
+  const handlePresetChange = (presetId: string) => {
+    setSelectedPresetId(presetId)
+  }
+
+  // Handle quality change
+  const handleQualityChange = (value: number[]) => {
+    if (selectedPreset) {
+      updateMutation.mutate({
+        id: selectedPreset.id,
+        quality: value[0]
+      })
     }
-  }, [settings, form])
+  }
 
-  // Update quality and fit when preset changes
-  const selectedPreset = form.watch('preset')
-
-  useEffect(() => {
-    if (selectedPreset && presets) {
-      const presetConfig = presets[selectedPreset]
-      if (presetConfig) {
-        form.setValue('quality', presetConfig.quality)
-        form.setValue('fit', presetConfig.fit)
-      }
+  // Handle fit mode change
+  const handleFitChange = (value: string) => {
+    if (selectedPreset) {
+      updateMutation.mutate({
+        id: selectedPreset.id,
+        fit: value as typeof selectedPreset.fit
+      })
     }
-  }, [selectedPreset, presets, form])
+  }
 
-  const onSubmit = async (data: ImageCompressionSettings) => {
-    try {
-      await updateMutation.mutateAsync(data)
-      setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 3000)
-    } catch (error) {
-      console.error('Failed to save settings:', error)
+  // Handle edit more dialog submit
+  const handleEditSubmit = async (data: CreatePresetInput) => {
+    if (selectedPreset) {
+      await updateMutation.mutateAsync({
+        id: selectedPreset.id,
+        ...data
+      })
     }
   }
 
@@ -103,14 +97,22 @@ function CompressionSettings() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold">Image Compression</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Configure default image compression settings for your uploads
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Image Compression</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Select a preset and adjust compression settings
+          </p>
+        </div>
+        <Link to="/settings/presets">
+          <Button variant="outline">
+            <IconSettings size={16} className="mr-2" />
+            Manage Presets
+          </Button>
+        </Link>
       </div>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <div className="space-y-6">
         <div className="rounded-md border border-border bg-card p-6">
           <div className="flex items-center gap-3 mb-6">
             <IconPhoto size={24} className="text-muted-foreground" />
@@ -119,113 +121,99 @@ function CompressionSettings() {
 
           <div className="space-y-6">
             {/* Preset Select */}
-            <Controller
-              name="preset"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>Default Preset</FieldLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger id={field.name} aria-invalid={fieldState.invalid} className="w-full">
-                      <SelectValue placeholder="Select preset" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {compressionPresets.map((preset) => (
-                        <SelectItem key={preset} value={preset}>
-                          <span className="capitalize">{preset}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {field.value && presetDescriptions[field.value] && (
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {presetDescriptions[field.value]}
-                    </p>
-                  )}
-                  {fieldState.error?.message && (
-                    <FieldError>{fieldState.error.message}</FieldError>
-                  )}
-                </Field>
-              )}
-            />
+            <div>
+              <label className="text-sm font-medium mb-2 block">Preset</label>
+              <Select onValueChange={handlePresetChange} value={selectedPresetId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select preset" />
+                </SelectTrigger>
+                <SelectContent>
+                  {presets?.map((preset) => (
+                    <SelectItem key={preset.id} value={preset.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{preset.name}</span>
+                        <span className="text-muted-foreground text-xs">
+                          {preset.maxWidth >= 999999 ? '∞' : preset.maxWidth}×
+                          {preset.maxHeight >= 999999 ? '∞' : preset.maxHeight}, {preset.quality}%,{' '}
+                          <span className="uppercase">{preset.format}</span>
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Quality Slider */}
-            <Controller
-              name="quality"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <div className="flex items-center justify-between mb-2">
-                    <FieldLabel htmlFor={field.name}>Quality</FieldLabel>
-                    <span className="text-sm font-medium text-muted-foreground">
-                      {field.value}%
-                    </span>
-                  </div>
-                  <Slider
-                    id={field.name}
-                    min={1}
-                    max={100}
-                    step={1}
-                    value={[field.value]}
-                    onValueChange={(value) => field.onChange(value[0])}
-                    aria-invalid={fieldState.invalid}
-                  />
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Higher quality means larger file sizes (1-100)
-                  </p>
-                  {fieldState.error?.message && (
-                    <FieldError>{fieldState.error.message}</FieldError>
-                  )}
-                </Field>
-              )}
-            />
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium">Quality</label>
+                <span className="text-sm font-medium text-muted-foreground">
+                  {selectedPreset?.quality ?? 85}%
+                </span>
+              </div>
+              <Slider
+                min={1}
+                max={100}
+                step={1}
+                value={[selectedPreset?.quality ?? 85]}
+                onValueChange={handleQualityChange}
+                disabled={!selectedPreset}
+              />
+              <p className="mt-2 text-sm text-muted-foreground">
+                Higher quality means larger file sizes (1-100)
+              </p>
+            </div>
 
             {/* Fit Mode Select */}
-            <Controller
-              name="fit"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>Fit Mode</FieldLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger id={field.name} aria-invalid={fieldState.invalid} className="w-full">
-                      <SelectValue placeholder="Select fit mode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {fitModes.map((mode) => (
-                        <SelectItem key={mode} value={mode}>
-                          <span className="capitalize">{mode}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {field.value && fitModeDescriptions[field.value] && (
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {fitModeDescriptions[field.value]}
-                    </p>
-                  )}
-                  {fieldState.error?.message && (
-                    <FieldError>{fieldState.error.message}</FieldError>
-                  )}
-                </Field>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Fit Mode</label>
+              <Select
+                onValueChange={handleFitChange}
+                value={selectedPreset?.fit ?? 'inside'}
+                disabled={!selectedPreset}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select fit mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  {fitModes.map((mode) => (
+                    <SelectItem key={mode} value={mode}>
+                      <span className="capitalize">{mode}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedPreset?.fit && fitModeDescriptions[selectedPreset.fit] && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {fitModeDescriptions[selectedPreset.fit]}
+                </p>
               )}
-            />
+            </div>
+
+            {/* Edit More Button */}
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setDialogOpen(true)}
+                disabled={!selectedPreset}
+              >
+                <IconEdit size={16} className="mr-2" />
+                Edit More
+              </Button>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Save Button */}
-        <div className="flex items-center gap-3">
-          <Button type="submit" disabled={updateMutation.isPending}>
-            {updateMutation.isPending ? 'Saving...' : 'Save Settings'}
-          </Button>
-          {showSuccess && (
-            <div className="flex items-center gap-2 text-sm text-green-600">
-              <IconCheck size={16} />
-              <span>Settings saved successfully</span>
-            </div>
-          )}
-        </div>
-      </form>
+      {/* Edit Preset Dialog */}
+      <PresetDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSubmit={handleEditSubmit}
+        preset={selectedPreset}
+        mode="edit"
+      />
     </div>
   )
 }
