@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { IconPhoto, IconSettings, IconEdit } from '@tabler/icons-react'
+import { IconPhoto, IconSettings, IconEdit, IconTestPipe } from '@tabler/icons-react'
 import { trpc } from '@renderer/lib/trpc'
 import { fitModes } from '@shared/schema/settings'
 import type { CreatePresetInput } from '@shared/schema/settings'
@@ -28,6 +28,25 @@ const fitModeDescriptions: Record<string, string> = {
   outside: 'Fit outside, may crop'
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+interface CompressionResult {
+  success: boolean
+  outputPath?: string
+  originalSize: number
+  compressedSize?: number
+  width?: number
+  height?: number
+  format?: string
+  error?: string
+}
+
 function CompressionSettings() {
   const { data: presets, isLoading } = trpc.preset.list.useQuery()
   const utils = trpc.useUtils()
@@ -37,11 +56,17 @@ function CompressionSettings() {
     }
   })
 
+  const selectFileMutation = trpc.image.selectImageFile.useMutation()
+  const compressFileMutation = trpc.image.compressFile.useMutation()
+
   // Currently selected preset ID
   const [selectedPresetId, setSelectedPresetId] = useState<string>('standard')
 
   // Edit dialog state
   const [dialogOpen, setDialogOpen] = useState(false)
+
+  // Compression test result
+  const [testResult, setTestResult] = useState<CompressionResult | null>(null)
 
   // Get selected preset data
   const selectedPreset = presets?.find((p) => p.id === selectedPresetId)
@@ -49,6 +74,7 @@ function CompressionSettings() {
   // Handle preset selection change
   const handlePresetChange = (presetId: string) => {
     setSelectedPresetId(presetId)
+    setTestResult(null)
   }
 
   // Handle quality change
@@ -80,6 +106,27 @@ function CompressionSettings() {
       })
     }
   }
+
+  // Handle test compression
+  const handleTestCompression = async () => {
+    setTestResult(null)
+
+    // Select file
+    const fileResult = await selectFileMutation.mutateAsync()
+    if (fileResult.canceled || !fileResult.filePath) {
+      return
+    }
+
+    // Compress file
+    const result = await compressFileMutation.mutateAsync({
+      filePath: fileResult.filePath,
+      presetId: selectedPresetId
+    })
+
+    setTestResult(result as CompressionResult)
+  }
+
+  const isTestingCompression = selectFileMutation.isPending || compressFileMutation.isPending
 
   if (isLoading) {
     return (
@@ -191,8 +238,8 @@ function CompressionSettings() {
               )}
             </div>
 
-            {/* Edit More Button */}
-            <div className="pt-2">
+            {/* Action Buttons */}
+            <div className="pt-2 flex items-center gap-3">
               <Button
                 variant="outline"
                 onClick={() => setDialogOpen(true)}
@@ -201,7 +248,77 @@ function CompressionSettings() {
                 <IconEdit size={16} className="mr-2" />
                 Edit More
               </Button>
+              <Button
+                variant="outline"
+                onClick={handleTestCompression}
+                disabled={!selectedPreset || isTestingCompression}
+              >
+                <IconTestPipe size={16} className="mr-2" />
+                {isTestingCompression ? 'Compressing...' : 'Test Compression'}
+              </Button>
             </div>
+
+            {/* Test Result */}
+            {testResult && (
+              <div
+                className={`mt-4 rounded-md border p-4 ${
+                  testResult.success
+                    ? 'border-green-200 bg-green-50 text-green-800'
+                    : 'border-red-200 bg-red-50 text-red-800'
+                }`}
+              >
+                {testResult.success ? (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">Compression successful</p>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-green-600">Original</p>
+                        <p className="font-medium">{formatBytes(testResult.originalSize)}</p>
+                      </div>
+                      <div>
+                        <p className="text-green-600">Compressed</p>
+                        <p className="font-medium">{formatBytes(testResult.compressedSize || 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-green-600">Saved</p>
+                        <p className="font-medium">
+                          {(
+                            ((testResult.originalSize - (testResult.compressedSize || 0)) /
+                              testResult.originalSize) *
+                            100
+                          ).toFixed(1)}
+                          %
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-4 text-sm">
+                      {testResult.width && testResult.height && (
+                        <p>
+                          <span className="text-green-600">Dimensions:</span>{' '}
+                          {testResult.width}×{testResult.height}
+                        </p>
+                      )}
+                      {testResult.format && (
+                        <p>
+                          <span className="text-green-600">Format:</span>{' '}
+                          <span className="uppercase">{testResult.format}</span>
+                        </p>
+                      )}
+                    </div>
+                    {testResult.outputPath && (
+                      <p className="text-sm text-green-600 break-all">
+                        Saved to: {testResult.outputPath}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Compression failed</p>
+                    <p className="text-sm">{testResult.error}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
