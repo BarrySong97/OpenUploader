@@ -1,6 +1,6 @@
 import { publicProcedure, router } from '../trpc'
 import { z } from 'zod'
-import { addProviderFormSchema, providerSchema } from '../../../shared/schema/provider'
+import { addProviderFormSchema, providerSchema } from '@shared/schema/provider'
 import {
   getProviderByIdInputSchema,
   deleteProviderInputSchema,
@@ -14,7 +14,7 @@ import {
   moveObjectInputSchema,
   moveObjectsInputSchema,
   createBucketInputSchema
-} from '../../../shared/schema/trpc/provider'
+} from '@shared/schema/trpc/provider'
 import {
   testConnection,
   getProviderStats,
@@ -28,8 +28,8 @@ import {
   moveObject,
   moveObjects,
   createBucket
-} from '../../services/provider-service'
-import { providerRepository } from '../../db/provider-repository'
+} from '@main/services/provider-service'
+import { providerRepository } from '@main/db/provider-repository'
 
 export const providerRouter = router({
   // ============ Provider CRUD Operations ============

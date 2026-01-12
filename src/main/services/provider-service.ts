@@ -12,7 +12,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { createClient } from '@supabase/supabase-js'
-import type { Provider, S3Provider, SupabaseProvider } from '../../shared/schema/provider'
+import type { Provider, S3Provider, SupabaseProvider } from '@shared/schema/provider'
 
 // ============ Types ============
 

@@ -9,7 +9,7 @@ export const Route = createRootRoute({
       <main className="flex-1 flex flex-col overflow-hidden">
         <div className="h-[30px] fixed right-0 w-[120px] draggable z-50"></div>
         <Header />
-        <div className="h-[calc(100vh-48px)] bg-white flex-1 overflow-hidden rounded-tl-md ">
+        <div className="h-[calc(100vh-48px)] bg-white flex-1 overflow-hidden rounded-tl-md">
           <Outlet />
         </div>
       </main>

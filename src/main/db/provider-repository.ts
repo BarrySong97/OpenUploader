@@ -5,7 +5,7 @@ import type {
   S3Provider,
   SupabaseProvider,
   AddProviderForm
-} from '../../shared/schema/provider'
+} from '@shared/schema/provider'
 import type { ProviderRecord, NewProviderRecord } from './schema'
 
 // Helper function to map DB record to Provider type

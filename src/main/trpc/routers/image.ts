@@ -5,7 +5,7 @@ import {
   getImageInfo,
   COMPRESSION_PRESETS,
   type CompressionPreset
-} from '../../services/image-service'
+} from '@main/services/image-service'
 
 const compressionPresetSchema = z.enum([
   'thumbnail',

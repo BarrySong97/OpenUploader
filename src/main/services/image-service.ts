@@ -1,8 +1,9 @@
 import sharp from 'sharp'
+import type { CompressionPreset, FitMode } from '@shared/schema/settings'
 
 // ============ Types ============
 
-export type CompressionPreset = 'thumbnail' | 'preview' | 'standard' | 'hd' | 'original'
+export type { CompressionPreset } from '@shared/schema/settings'
 
 export interface CompressionConfig {
   preset: CompressionPreset
@@ -10,6 +11,7 @@ export interface CompressionConfig {
   maxHeight: number
   quality: number
   format: 'webp' | 'jpeg' | 'png' | 'original'
+  fit: FitMode
 }
 
 export const COMPRESSION_PRESETS: Record<CompressionPreset, CompressionConfig> = {
@@ -18,35 +20,40 @@ export const COMPRESSION_PRESETS: Record<CompressionPreset, CompressionConfig> =
     maxWidth: 200,
     maxHeight: 200,
     quality: 60,
-    format: 'webp'
+    format: 'webp',
+    fit: 'cover'
   },
   preview: {
     preset: 'preview',
     maxWidth: 800,
     maxHeight: 800,
     quality: 75,
-    format: 'webp'
+    format: 'webp',
+    fit: 'inside'
   },
   standard: {
     preset: 'standard',
     maxWidth: 1920,
     maxHeight: 1920,
     quality: 85,
-    format: 'webp'
+    format: 'webp',
+    fit: 'inside'
   },
   hd: {
     preset: 'hd',
     maxWidth: 4096,
     maxHeight: 4096,
     quality: 90,
-    format: 'webp'
+    format: 'webp',
+    fit: 'inside'
   },
   original: {
     preset: 'original',
     maxWidth: Infinity,
     maxHeight: Infinity,
     quality: 100,
-    format: 'original'
+    format: 'original',
+    fit: 'inside'
   }
 }
 
@@ -54,6 +61,7 @@ export interface CompressImageInput {
   content: string // Base64 encoded
   preset: CompressionPreset
   filename?: string
+  fit?: FitMode
 }
 
 export interface CompressImageResult {
@@ -128,7 +136,7 @@ export async function compressImage(input: CompressImageInput): Promise<Compress
 
     // Process image
     let pipeline = sharp(inputBuffer).resize(targetWidth, targetHeight, {
-      fit: 'inside',
+      fit: input.fit || 'inside',
       withoutEnlargement: true
     })
 

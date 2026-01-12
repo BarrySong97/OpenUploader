@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { CreateBucketDialog } from '@renderer/components/provider/create-bucket-dialog'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
+import { PageLayout } from '@/components/layout/page-layout'
 
 export const Route = createFileRoute('/provider/$providerId')({
   component: ProviderDetail
@@ -55,40 +56,38 @@ function ProviderDetail() {
 
 function ProviderDetailSkeleton() {
   return (
-    <div className="flex-1 overflow-auto p-8">
-      <div className="mx-auto max-w-[1200px] space-y-8">
-        {/* Provider Info Card Skeleton */}
-        <div className="rounded-md border bg-card p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-5">
-              <Skeleton className="h-20 w-20 rounded-2xl" />
-              <div>
-                <Skeleton className="h-8 w-48" />
-                <div className="mt-3 flex gap-2">
-                  <Skeleton className="h-6 w-24" />
-                  <Skeleton className="h-6 w-20" />
-                  <Skeleton className="h-6 w-24" />
-                </div>
+    <PageLayout className="space-y-8">
+      {/* Provider Info Card Skeleton */}
+      <div className="rounded-md border bg-card p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-5">
+            <Skeleton className="h-20 w-20 rounded-2xl" />
+            <div>
+              <Skeleton className="h-8 w-48" />
+              <div className="mt-3 flex gap-2">
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-6 w-20" />
+                <Skeleton className="h-6 w-24" />
               </div>
             </div>
-            <Skeleton className="h-9 w-9" />
           </div>
-          <div className="mt-6 border-t pt-6">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="mt-2 h-10 w-full" />
-          </div>
+          <Skeleton className="h-9 w-9" />
         </div>
-
-        {/* Bucket List Skeleton */}
-        <div>
-          <div className="mb-4 flex items-center justify-between">
-            <Skeleton className="h-7 w-32" />
-            <Skeleton className="h-9 w-32" />
-          </div>
-          <BucketTableSkeleton />
+        <div className="mt-6 border-t pt-6">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="mt-2 h-10 w-full" />
         </div>
       </div>
-    </div>
+
+      {/* Bucket List Skeleton */}
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+          <Skeleton className="h-7 w-32" />
+          <Skeleton className="h-9 w-32" />
+        </div>
+        <BucketTableSkeleton />
+      </div>
+    </PageLayout>
   )
 }
 
@@ -201,147 +200,145 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-8">
-      <div className="mx-auto max-w-[1200px] space-y-8">
-        {/* Provider Info Card */}
-        <section className="rounded-md border bg-card shadow-sm">
-          <div className="p-6">
-            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-              <div className="flex items-start gap-5">
-                {/* Provider Icon */}
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border bg-gradient-to-br from-gray-50 to-gray-100 shadow-inner dark:from-gray-800 dark:to-gray-900">
-                  <span className="text-gray-700 dark:text-gray-300">
-                    {getProviderIcon(provider, 40)}
-                  </span>
-                </div>
+    <PageLayout className="space-y-8">
+      {/* Provider Info Card */}
+      <section className="rounded-md border bg-card shadow-sm">
+        <div className="p-6">
+          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+            <div className="flex items-start gap-5">
+              {/* Provider Icon */}
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border bg-gradient-to-br from-gray-50 to-gray-100 shadow-inner dark:from-gray-800 dark:to-gray-900">
+                <span className="text-gray-700 dark:text-gray-300">
+                  {getProviderIcon(provider, 40)}
+                </span>
+              </div>
 
-                {/* Provider Info */}
-                <div>
-                  <h1 className="text-2xl font-bold">{provider.name}</h1>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {/* Storage Type Badge */}
-                    <Badge variant="secondary" className="gap-1.5">
-                      <IconDatabase size={14} />
-                      {getProviderStorageLabel(provider)}
-                    </Badge>
+              {/* Provider Info */}
+              <div>
+                <h1 className="text-2xl font-bold">{provider.name}</h1>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {/* Storage Type Badge */}
+                  <Badge variant="secondary" className="gap-1.5">
+                    <IconDatabase size={14} />
+                    {getProviderStorageLabel(provider)}
+                  </Badge>
 
-                    {/* Region Badge */}
-                    {region && (
-                      <Badge
-                        variant="outline"
-                        className="gap-1.5 border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/30 dark:bg-blue-900/20 dark:text-blue-300"
-                      >
-                        <IconCloud size={14} />
-                        {region}
-                      </Badge>
-                    )}
-
-                    {/* Connection Status Badge */}
+                  {/* Region Badge */}
+                  {region && (
                     <Badge
                       variant="outline"
-                      className={cn(
-                        'gap-1.5',
-                        isLoading
-                          ? 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-900/30 dark:bg-yellow-900/20 dark:text-yellow-300'
-                          : isConnected
-                            ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-900/30 dark:bg-green-900/20 dark:text-green-300'
-                            : 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/30 dark:bg-red-900/20 dark:text-red-300'
-                      )}
+                      className="gap-1.5 border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/30 dark:bg-blue-900/20 dark:text-blue-300"
                     >
-                      <span
-                        className={cn(
-                          'h-1.5 w-1.5 rounded-full',
-                          isLoading
-                            ? 'animate-pulse bg-yellow-500'
-                            : isConnected
-                              ? 'animate-pulse bg-green-500'
-                              : 'bg-red-500'
-                        )}
-                      />
-                      {isLoading ? 'Checking...' : isConnected ? 'Connected' : 'Disconnected'}
+                      <IconCloud size={14} />
+                      {region}
                     </Badge>
-                  </div>
-                </div>
-              </div>
+                  )}
 
-              {/* Settings Button */}
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
-                <IconSettings size={20} />
-              </Button>
-            </div>
-
-            {/* Endpoint URL Section */}
-            {endpoint && (
-              <div className="mt-6 border-t pt-6">
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  S3 Endpoint URL
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 overflow-x-auto whitespace-nowrap rounded-lg border bg-muted/30 px-3 py-2 font-mono text-sm text-muted-foreground">
-                    {endpoint}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0 text-muted-foreground"
-                    onClick={handleCopyEndpoint}
-                    title={copied ? 'Copied!' : 'Copy URL'}
+                  {/* Connection Status Badge */}
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'gap-1.5',
+                      isLoading
+                        ? 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-900/30 dark:bg-yellow-900/20 dark:text-yellow-300'
+                        : isConnected
+                          ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-900/30 dark:bg-green-900/20 dark:text-green-300'
+                          : 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/30 dark:bg-red-900/20 dark:text-red-300'
+                    )}
                   >
-                    <IconCopy size={18} />
-                  </Button>
+                    <span
+                      className={cn(
+                        'h-1.5 w-1.5 rounded-full',
+                        isLoading
+                          ? 'animate-pulse bg-yellow-500'
+                          : isConnected
+                            ? 'animate-pulse bg-green-500'
+                            : 'bg-red-500'
+                      )}
+                    />
+                    {isLoading ? 'Checking...' : isConnected ? 'Connected' : 'Disconnected'}
+                  </Badge>
                 </div>
               </div>
-            )}
-          </div>
-        </section>
-
-        {/* Bucket List Section */}
-        <section>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              Bucket List
-              <span className="rounded-full border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                {stats?.bucketCount ?? 0}
-              </span>
-            </h2>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refresh}
-                disabled={isLoading}
-                className="gap-2"
-              >
-                <IconRefresh size={16} className={cn(isLoading && 'animate-spin')} />
-                Refresh
-              </Button>
-              <Button size="sm" className="gap-2" onClick={() => setCreateBucketOpen(true)}>
-                <IconFolderPlus size={16} />
-                Create Bucket
-              </Button>
             </div>
+
+            {/* Settings Button */}
+            <Button variant="ghost" size="icon" className="text-muted-foreground">
+              <IconSettings size={20} />
+            </Button>
           </div>
 
-          {isLoading ? (
-            <BucketTableSkeleton />
-          ) : error ? (
-            <div className="flex h-64 items-center justify-center rounded-md border">
-              <div className="text-center">
-                <p className="text-destructive">{error}</p>
-                <Button variant="outline" className="mt-4" onClick={refresh}>
-                  Try Again
+          {/* Endpoint URL Section */}
+          {endpoint && (
+            <div className="mt-6 border-t pt-6">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                S3 Endpoint URL
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 overflow-x-auto whitespace-nowrap rounded-lg border bg-muted/30 px-3 py-2 font-mono text-sm text-muted-foreground">
+                  {endpoint}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground"
+                  onClick={handleCopyEndpoint}
+                  title={copied ? 'Copied!' : 'Copy URL'}
+                >
+                  <IconCopy size={18} />
                 </Button>
               </div>
             </div>
-          ) : (
-            <BucketTable
-              buckets={stats?.buckets ?? []}
-              onBucketClick={handleBucketClick}
-              onBucketDelete={handleBucketDelete}
-            />
           )}
-        </section>
-      </div>
+        </div>
+      </section>
+
+      {/* Bucket List Section */}
+      <section>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            Bucket List
+            <span className="rounded-full border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+              {stats?.bucketCount ?? 0}
+            </span>
+          </h2>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refresh}
+              disabled={isLoading}
+              className="gap-2"
+            >
+              <IconRefresh size={16} className={cn(isLoading && 'animate-spin')} />
+              Refresh
+            </Button>
+            <Button size="sm" className="gap-2" onClick={() => setCreateBucketOpen(true)}>
+              <IconFolderPlus size={16} />
+              Create Bucket
+            </Button>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <BucketTableSkeleton />
+        ) : error ? (
+          <div className="flex h-64 items-center justify-center rounded-md border">
+            <div className="text-center">
+              <p className="text-destructive">{error}</p>
+              <Button variant="outline" className="mt-4" onClick={refresh}>
+                Try Again
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <BucketTable
+            buckets={stats?.buckets ?? []}
+            onBucketClick={handleBucketClick}
+            onBucketDelete={handleBucketDelete}
+          />
+        )}
+      </section>
 
       {/* Create Bucket Dialog */}
       <CreateBucketDialog
@@ -350,6 +347,6 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
         onOpenChange={setCreateBucketOpen}
         onSuccess={refresh}
       />
-    </div>
+    </PageLayout>
   )
 }
