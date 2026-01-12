@@ -45,16 +45,24 @@ export function Header() {
   const renderBreadcrumbs = () => {
     const items: React.ReactNode[] = []
 
-    // 1. Dashboard - 不显示任何内容
+    // 1. Dashboard
     const dashboardConfig = findRouteConfig('/')
     const isOnDashboard = currentPath === '/'
 
     if (isOnDashboard) {
-      // Dashboard 页面不显示面包屑
+      // Dashboard page - show as active (no background/shadow)
+      items.push(
+        <BreadcrumbItem key="dashboard">
+          <div className="flex items-center gap-2">
+            {dashboardConfig?.icon && <dashboardConfig.icon size={16} />}
+            <span className={activeTextStyle}>{dashboardConfig?.label}</span>
+          </div>
+        </BreadcrumbItem>
+      )
       return items
     }
 
-    // Dashboard 作为链接
+    // Dashboard as link (not on dashboard page)
     items.push(
       <BreadcrumbItem key="dashboard">
         <BreadcrumbLink asChild>

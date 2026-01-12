@@ -4,7 +4,14 @@ import { ElectronTRPC } from 'trpc-electron/main'
 declare global {
   interface Window {
     electron: ElectronAPI
-    api: unknown
+    api: {
+      platform: {
+        isMac: boolean
+        isWindows: boolean
+        isLinux: boolean
+        name: NodeJS.Platform
+      }
+    }
     electronTRPC: ElectronTRPC
   }
 }

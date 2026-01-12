@@ -8,7 +8,14 @@ process.once('loaded', () => {
 })
 
 // Custom APIs for renderer
-const api = {}
+const api = {
+  platform: {
+    isMac: process.platform === 'darwin',
+    isWindows: process.platform === 'win32',
+    isLinux: process.platform === 'linux',
+    name: process.platform
+  }
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise

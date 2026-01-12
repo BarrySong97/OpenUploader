@@ -81,20 +81,6 @@ function Index() {
   return (
     <div className="h-full overflow-auto">
       <div className="mx-auto p-8">
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="mt-2 text-muted-foreground">
-              Manage all your object storage providers in one place.
-            </p>
-          </div>
-          <Button onClick={() => handleAddProvider()}>
-            <IconPlus size={18} className="mr-2" />
-            Add Provider
-          </Button>
-        </div>
-
         {/* Stats Grid */}
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatCard

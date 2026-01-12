@@ -96,7 +96,10 @@ export function Sidebar() {
   return (
     <div
       id="sidebar"
-      className="relative overflow-hidden flex min-h-screen h-full w-[72px] flex-col items-center  bg-[#f2f8f3bf] dark:bg-[#1E1F22] overflow-x-hidden no-draggable py-3 gap-2"
+      className={cn(
+        'relative overflow-hidden flex min-h-screen h-full w-[72px] flex-col items-center bg-[#f2f8f3bf] dark:bg-[#1E1F22] overflow-x-hidden py-3 gap-2',
+        window.api.platform.isMac && 'pt-[30px]'
+      )}
     >
       {/* Dashboard Button */}
       <SidebarMenuButton
