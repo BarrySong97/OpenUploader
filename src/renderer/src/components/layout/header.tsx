@@ -21,10 +21,10 @@ function getProviderIcon(variant?: string) {
 
 // 面包屑项样式
 const linkStyle =
-  'flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-white transition-colors no-draggable cursor-pointer px-2 py-0.5 rounded-md'
+  'flex items-center gap-2 text-gray-500  hover:bg-accent rounded-md transition-colors no-draggable cursor-pointer px-2 py-0.5 rounded-md'
 const badgeStyle =
-  'flex items-center gap-2 bg-white px-2 py-0.5 rounded shadow-sm border border-gray-200 dark:border-gray-700 no-draggable cursor-pointer hover:bg-accent/20 transition-colors'
-const activeTextStyle = 'text-gray-900 dark:text-white'
+  'flex items-center gap-2 bg-white px-2 py-0.5  no-draggable cursor-pointer hover:bg-accent rounded-md transition-colors'
+const activeTextStyle = 'text-gray-900 '
 
 export function Header() {
   const router = useRouterState()
@@ -265,7 +265,7 @@ export function Header() {
   return (
     <header
       className={cn(
-        'pr-[140px] flex items-center gap-2 shrink-0 bg-[#f2f8f3bf] dark:bg-[#1E1F22]   dark:border-[#333333] draggable ',
+        'pl-4 pr-[140px] flex items-center gap-2 shrink-0 bg-white dark:bg-[#1E1F22]   dark:border-[#333333] draggable ',
         window.api.platform.isMac ? 'pt-0 h-10 ' : 'h-12'
       )}
     >

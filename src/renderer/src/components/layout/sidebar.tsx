@@ -39,8 +39,8 @@ function ActiveIndicator() {
 const menuButtonStyles = cn(
   // Reset shadcn default active/hover styles
   'data-active:bg-white data-active:dark:bg-[#2a2a2a] data-active:shadow-sm data-active:text-foreground rounded-md',
-  'hover:bg-white/50 dark:hover:bg-white/10',
-  'active:bg-white/50 dark:active:bg-white/10'
+  'hover:bg-white/90 ',
+  'active:bg-white/90 '
 )
 
 // Toggle sidebar button component

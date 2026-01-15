@@ -147,20 +147,8 @@ export async function uploadFile(input: UploadFileInput) {
     contentType: input.contentType
   })
 
-  // Record upload history if successful
-  if (result.success) {
-    const fileName = input.key.split('/').pop() || input.key
-    await uploadHistoryService.recordUpload({
-      providerId: input.provider.id,
-      bucket: input.bucket,
-      key: input.key,
-      name: fileName,
-      type: 'file',
-      size: buffer.length,
-      mimeType: input.contentType,
-      uploadSource: 'app'
-    })
-  }
+  // Note: Upload history is now managed by the frontend via uploadHistory.createRecord and updateStatus
+  // This allows tracking of upload failures and in-progress uploads
 
   return result
 }

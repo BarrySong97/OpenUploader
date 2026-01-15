@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   IconUpload,
   IconRefresh,
@@ -8,13 +8,28 @@ import {
   IconTrash,
   IconFile,
   IconDatabase,
-  IconClock
+  IconClock,
+  IconCheck,
+  IconX
 } from '@tabler/icons-react'
 import { trpc } from '@renderer/lib/trpc'
+import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { UploadHistoryTableSkeleton } from '@/components/ui/table-skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog'
 import {
   Table,
   TableBody,
@@ -36,6 +51,28 @@ export const Route = createFileRoute('/my-uploads')({
 function MyUploadsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string
+    providerId: string
+    bucket: string
+    key: string
+    type: 'file' | 'folder'
+    name: string
+  } | null>(null)
+  const [selectedItems, setSelectedItems] = useState<
+    Record<
+      string,
+      {
+        providerId: string
+        bucket: string
+        key: string
+        type: 'file' | 'folder'
+        name: string
+      }
+    >
+  >({})
+  const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false)
+  const [batchMenuOpen, setBatchMenuOpen] = useState(false)
   const pageSize = 50
 
   // Fetch upload history
@@ -51,19 +88,182 @@ function MyUploadsPage() {
   const { data: stats } = trpc.uploadHistory.getStats.useQuery({})
 
   // Delete mutation
-  const deleteMutation = trpc.uploadHistory.deleteRecord.useMutation({
+  const deleteObjectMutation = trpc.provider.deleteObject.useMutation({
     onSuccess: () => {
       refetch()
     }
   })
+  const deleteObjectsMutation = trpc.provider.deleteObjects.useMutation()
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Delete this record? The file will remain in cloud storage.')) {
-      await deleteMutation.mutateAsync({ id })
+  const trpcUtils = trpc.useUtils()
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
+
+    try {
+      const provider = await trpcUtils.provider.getById.fetch({ id: deleteTarget.providerId })
+      if (!provider) {
+        toast({
+          title: 'Delete failed',
+          description: 'Provider not found for this upload record.',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      const result = await deleteObjectMutation.mutateAsync({
+        provider,
+        bucket: deleteTarget.bucket,
+        key: deleteTarget.key,
+        isFolder: deleteTarget.type === 'folder'
+      })
+
+      if (result.success) {
+        setDeleteTarget(null)
+        return
+      }
+
+      toast({
+        title: 'Delete failed',
+        description: result.error || 'Unable to delete the file.',
+        variant: 'destructive'
+      })
+    } catch (error) {
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Unable to delete the file.',
+        variant: 'destructive'
+      })
     }
   }
 
-  const trpcUtils = trpc.useUtils()
+  const selectedIds = Object.keys(selectedItems)
+  const selectedCount = selectedIds.length
+
+  useEffect(() => {
+    if (selectedCount > 0) {
+      setBatchMenuOpen(true)
+    } else {
+      setBatchMenuOpen(false)
+    }
+  }, [selectedCount])
+
+  const handleToggleSelection = (item: {
+    id: string
+    providerId: string
+    bucket: string
+    key: string
+    type: 'file' | 'folder'
+    name: string
+  }, checked: boolean) => {
+    setSelectedItems((prev) => {
+      if (!checked) {
+        const { [item.id]: _, ...rest } = prev
+        return rest
+      }
+      return {
+        ...prev,
+        [item.id]: {
+          providerId: item.providerId,
+          bucket: item.bucket,
+          key: item.key,
+          type: item.type,
+          name: item.name
+        }
+      }
+    })
+  }
+
+  const handleToggleAll = (checked: boolean) => {
+    if (!data?.data) return
+    setSelectedItems((prev) => {
+      if (!checked) {
+        const next = { ...prev }
+        for (const item of data.data) {
+          delete next[item.id]
+        }
+        return next
+      }
+      const next = { ...prev }
+      for (const item of data.data) {
+        next[item.id] = {
+          providerId: item.providerId,
+          bucket: item.bucket,
+          key: item.key,
+          type: item.type,
+          name: item.name
+        }
+      }
+      return next
+    })
+  }
+
+  const handleClearSelection = () => {
+    setSelectedItems({})
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedCount === 0) return
+
+    const groups = new Map<string, { providerId: string; bucket: string; keys: string[] }>()
+    for (const item of Object.values(selectedItems)) {
+      const groupKey = `${item.providerId}::${item.bucket}`
+      const group = groups.get(groupKey)
+      if (group) {
+        group.keys.push(item.key)
+      } else {
+        groups.set(groupKey, {
+          providerId: item.providerId,
+          bucket: item.bucket,
+          keys: [item.key]
+        })
+      }
+    }
+
+    try {
+      const providerCache = new Map<string, Awaited<ReturnType<typeof trpcUtils.provider.getById.fetch>> | null>()
+
+      for (const group of groups.values()) {
+        if (!providerCache.has(group.providerId)) {
+          const provider = await trpcUtils.provider.getById.fetch({ id: group.providerId })
+          providerCache.set(group.providerId, provider ?? null)
+        }
+        const provider = providerCache.get(group.providerId)
+        if (!provider) {
+          toast({
+            title: 'Delete failed',
+            description: 'Provider not found for selected items.',
+            variant: 'destructive'
+          })
+          continue
+        }
+
+        const result = await deleteObjectsMutation.mutateAsync({
+          provider,
+          bucket: group.bucket,
+          keys: group.keys
+        })
+
+        if (!result.success) {
+          toast({
+            title: 'Delete failed',
+            description: result.error || 'Unable to delete selected files.',
+            variant: 'destructive'
+          })
+        }
+      }
+
+      setSelectedItems({})
+      setBatchDeleteDialogOpen(false)
+      refetch()
+    } catch (error) {
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Unable to delete selected files.',
+        variant: 'destructive'
+      })
+    }
+  }
 
   const handleDownload = async (providerId: string, bucket: string, key: string) => {
     try {
@@ -82,6 +282,34 @@ function MyUploadsPage() {
     }
   }
 
+  const renderStatusBadge = (status: string, errorMessage?: string | null) => {
+    switch (status) {
+      case 'completed':
+        return (
+          <Badge variant="default" className="bg-green-500">
+            <IconCheck size={14} className="mr-1" />
+            Completed
+          </Badge>
+        )
+      case 'error':
+        return (
+          <Badge variant="destructive" title={errorMessage ?? undefined}>
+            <IconX size={14} className="mr-1" />
+            Failed
+          </Badge>
+        )
+      case 'uploading':
+        return (
+          <Badge variant="secondary">
+            <IconRefresh size={14} className="mr-1 animate-spin" />
+            Uploading
+          </Badge>
+        )
+      default:
+        return <Badge variant="secondary">Pending</Badge>
+    }
+  }
+
   // Loading state
   if (isLoading) {
     return (
@@ -93,51 +321,7 @@ function MyUploadsPage() {
         </div>
         <div>
           <Skeleton className="mb-4 h-7 w-40" />
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Name
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Bucket
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Size
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Uploaded
-                  </TableHead>
-                  <TableHead className="w-24" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array.from({ length: 10 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Skeleton className="h-8 w-8" />
-                        <Skeleton className="h-4 w-48" />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-24" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-16" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-32" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-7 w-16" />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <UploadHistoryTableSkeleton />
         </div>
       </PageLayout>
     )
@@ -205,6 +389,22 @@ function MyUploadsPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={
+                          data.data.length > 0 &&
+                          (data.data.every((item) => selectedItems[item.id])
+                            ? true
+                            : data.data.some((item) => selectedItems[item.id])
+                              ? 'indeterminate'
+                              : false)
+                        }
+                        onCheckedChange={(value) =>
+                          handleToggleAll(value === true || value === 'indeterminate')
+                        }
+                        aria-label="Select all"
+                      />
+                    </TableHead>
                     <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Name
                     </TableHead>
@@ -213,6 +413,9 @@ function MyUploadsPage() {
                     </TableHead>
                     <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Size
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Status
                     </TableHead>
                     <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Uploaded
@@ -236,6 +439,25 @@ function MyUploadsPage() {
                     return (
                       <TableRow key={item.id} className="group">
                         <TableCell>
+                          <Checkbox
+                            checked={!!selectedItems[item.id]}
+                            onCheckedChange={(value) =>
+                              handleToggleSelection(
+                                {
+                                  id: item.id,
+                                  providerId: item.providerId,
+                                  bucket: item.bucket,
+                                  key: item.key,
+                                  type: item.type,
+                                  name: item.name
+                                },
+                                value === true
+                              )
+                            }
+                            aria-label={`Select ${item.name}`}
+                          />
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="flex-shrink-0">{fileIcon}</div>
                             <div className="flex items-center gap-2">
@@ -252,6 +474,7 @@ function MyUploadsPage() {
                         <TableCell className="text-muted-foreground">
                           {item.size ? formatFileSize(item.size) : '-'}
                         </TableCell>
+                        <TableCell>{renderStatusBadge(item.status, item.errorMessage)}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(new Date(item.uploadedAt), 'MMM dd, yyyy HH:mm')}
                         </TableCell>
@@ -277,8 +500,17 @@ function MyUploadsPage() {
                                 'hover:bg-red-50 hover:text-red-500',
                                 'dark:hover:bg-red-900/20'
                               )}
-                              onClick={() => handleDelete(item.id)}
-                              disabled={deleteMutation.isPending}
+                              onClick={() =>
+                                setDeleteTarget({
+                                  id: item.id,
+                                  providerId: item.providerId,
+                                  bucket: item.bucket,
+                                  key: item.key,
+                                  type: item.type,
+                                  name: item.name
+                                })
+                              }
+                              disabled={deleteObjectMutation.isPending}
                             >
                               <IconTrash size={16} />
                             </Button>
@@ -326,6 +558,73 @@ function MyUploadsPage() {
           </div>
         )}
       </div>
+      {selectedCount > 0 && batchMenuOpen && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-3 rounded-full border border-border bg-background px-4 py-2 shadow-lg">
+            <span className="text-sm font-medium">{selectedCount} items selected</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setBatchDeleteDialogOpen(true)}
+              className="h-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <IconTrash size={16} className="mr-1" />
+              Delete
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleClearSelection} className="h-8">
+              Clear selection
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setBatchMenuOpen(false)}
+              className="h-8"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      )}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{deleteTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This deletes the file from storage and removes the upload history record.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteObjectMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleteObjectMutation.isPending}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              {deleteObjectMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={batchDeleteDialogOpen} onOpenChange={setBatchDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedCount} items?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This deletes the files from storage and removes the upload history records.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteObjectsMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBatchDelete}
+              disabled={deleteObjectsMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteObjectsMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageLayout>
   )
 }

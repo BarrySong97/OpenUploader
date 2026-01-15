@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
-  IconPhoto,
   IconUpload,
   IconLoader2,
   IconScissors,
   IconCheck,
-  IconTrash
+  IconTrash,
+  IconFile
 } from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import {
@@ -40,7 +40,7 @@ import { ImageCropper } from '@/components/ui/image-cropper'
 import { useUploadStore } from '@renderer/stores/upload-store'
 import { formatFileSize } from '@/lib/utils'
 
-interface ImageUploadDrawerProps {
+interface UploadFilesDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   files: File[]
@@ -51,12 +51,13 @@ interface ImageUploadDrawerProps {
   onUploadComplete?: () => void
 }
 
-interface ImageUploadItem {
+interface UploadFileItem {
   file: File
   previewUrl: string
   selectedPreset: string | null
-  croppedContent: string | null // 手动裁切后的 base64，null = 未裁切
-  needsCrop: boolean // 是否需要裁切 (preset有aspectRatio)
+  croppedContent: string | null
+  needsCrop: boolean
+  isImage: boolean
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -72,7 +73,16 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
-export function ImageUploadDrawer({
+function isImageFile(file: File): boolean {
+  return (
+    file.type.startsWith('image/') &&
+    ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'].includes(
+      file.type.toLowerCase()
+    )
+  )
+}
+
+export function UploadFilesDrawer({
   open,
   onOpenChange,
   files,
@@ -81,8 +91,8 @@ export function ImageUploadDrawer({
   prefix,
   onUploadStart,
   onUploadComplete
-}: ImageUploadDrawerProps) {
-  const [imageItems, setImageItems] = useState<ImageUploadItem[]>([])
+}: UploadFilesDrawerProps) {
+  const [fileItems, setFileItems] = useState<UploadFileItem[]>([])
   const [keepOriginal, setKeepOriginal] = useState(false)
   const [generateBlurHash, setGenerateBlurHash] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -93,28 +103,38 @@ export function ImageUploadDrawer({
   const uploadMutation = trpc.provider.uploadFile.useMutation()
   const compressMutation = trpc.image.compress.useMutation()
   const blurHashMutation = trpc.image.generateBlurHash.useMutation()
+  const createRecordMutation = trpc.uploadHistory.createRecord.useMutation()
+  const updateStatusMutation = trpc.uploadHistory.updateStatus.useMutation()
   const trpcUtils = trpc.useUtils()
 
   const { addTask, updateTask, setDrawerOpen: setUploadDrawerOpen } = useUploadStore()
 
-  // Initialize image items when files change
+  // Initialize file items when files change
   useEffect(() => {
     if (!open || files.length === 0) {
-      setImageItems([])
+      setFileItems([])
       return
     }
 
-    const newItems: ImageUploadItem[] = files.map((file) => ({
-      file,
-      previewUrl: URL.createObjectURL(file),
-      selectedPreset: 'content', // Default preset
-      croppedContent: null,
-      needsCrop: false
-    }))
-    setImageItems(newItems)
+    const newItems: UploadFileItem[] = files.map((file) => {
+      const isImage = isImageFile(file)
+      return {
+        file,
+        previewUrl: isImage ? URL.createObjectURL(file) : '',
+        selectedPreset: null,
+        croppedContent: null,
+        needsCrop: false,
+        isImage
+      }
+    })
+    setFileItems(newItems)
 
     return () => {
-      newItems.forEach((item) => URL.revokeObjectURL(item.previewUrl))
+      newItems.forEach((item) => {
+        if (item.previewUrl) {
+          URL.revokeObjectURL(item.previewUrl)
+        }
+      })
     }
   }, [open, files])
 
@@ -130,9 +150,27 @@ export function ImageUploadDrawer({
   // Update needsCrop when preset changes
   const updatePreset = (index: number, presetId: string) => {
     const preset = presets?.find((p) => p.id === presetId)
-    setImageItems((prev) =>
+    setFileItems((prev) =>
       prev.map((item, i) =>
         i === index
+          ? item.isImage
+          ? {
+              ...item,
+              selectedPreset: presetId,
+              needsCrop: !!preset?.aspectRatio,
+              croppedContent: preset?.aspectRatio ? item.croppedContent : null
+            }
+          : item
+          : item
+      )
+    )
+  }
+
+  const applyPresetToAll = (presetId: string) => {
+    const preset = presets?.find((p) => p.id === presetId)
+    setFileItems((prev) =>
+      prev.map((item) =>
+        item.isImage
           ? {
               ...item,
               selectedPreset: presetId,
@@ -144,22 +182,12 @@ export function ImageUploadDrawer({
     )
   }
 
-  const applyPresetToAll = (presetId: string) => {
-    const preset = presets?.find((p) => p.id === presetId)
-    setImageItems((prev) =>
-      prev.map((item) => ({
-        ...item,
-        selectedPreset: presetId,
-        needsCrop: !!preset?.aspectRatio,
-        croppedContent: preset?.aspectRatio ? item.croppedContent : null
-      }))
-    )
-  }
-
   const removeImage = (index: number) => {
-    setImageItems((prev) => {
+    setFileItems((prev) => {
       const newItems = [...prev]
-      URL.revokeObjectURL(newItems[index].previewUrl)
+      if (newItems[index].previewUrl) {
+        URL.revokeObjectURL(newItems[index].previewUrl)
+      }
       newItems.splice(index, 1)
       return newItems
     })
@@ -174,7 +202,7 @@ export function ImageUploadDrawer({
     if (currentCropIndex !== null) {
       // Extract base64 content (remove data:image/png;base64, prefix)
       const base64Content = croppedImageData.split(',')[1]
-      setImageItems((prev) =>
+      setFileItems((prev) =>
         prev.map((item, i) =>
           i === currentCropIndex ? { ...item, croppedContent: base64Content } : item
         )
@@ -184,40 +212,60 @@ export function ImageUploadDrawer({
     setCurrentCropIndex(null)
   }
 
-  const currentCropItem = currentCropIndex !== null ? imageItems[currentCropIndex] : null
+  const currentCropItem = currentCropIndex !== null ? fileItems[currentCropIndex] : null
   const currentPreset =
     currentCropItem && presets?.find((p) => p.id === currentCropItem.selectedPreset)
 
   const totalTasks = useMemo(() => {
-    const validItems = imageItems.filter((item) => item.selectedPreset !== null)
-    let count = validItems.length
-    if (keepOriginal) count += imageItems.length
+    const imageItems = fileItems.filter((item) => item.isImage)
+    const compressedCount = imageItems.filter((item) => item.selectedPreset !== null).length
+    let count = fileItems.length
+    if (keepOriginal) count += compressedCount
     if (generateBlurHash) count += imageItems.length
     return count
-  }, [imageItems, keepOriginal, generateBlurHash])
+  }, [fileItems, keepOriginal, generateBlurHash])
+
+  const imageCount = useMemo(
+    () => fileItems.filter((item) => item.isImage).length,
+    [fileItems]
+  )
+
+  const presetCount = useMemo(
+    () => fileItems.filter((item) => item.isImage && item.selectedPreset !== null).length,
+    [fileItems]
+  )
 
   const processUploads = async () => {
     // Process each image item
-    for (const item of imageItems) {
+    for (const item of fileItems) {
       const file = item.file
       const originalContent = await fileToBase64(file)
       const originalFilename = file.name
       const originalContentType = file.type
+      const isImage = item.isImage
+      const shouldCompress = isImage && item.selectedPreset !== null
 
       // Get original image info
       let originalWidth: number | undefined
       let originalHeight: number | undefined
-      try {
-        const imageInfo = await trpcUtils.image.getInfo.fetch({ content: originalContent })
-        originalWidth = imageInfo.width
-        originalHeight = imageInfo.height
-      } catch {
-        // Ignore
+      if (isImage) {
+        try {
+          const imageInfo = await trpcUtils.image.getInfo.fetch({ content: originalContent })
+          originalWidth = imageInfo.width
+          originalHeight = imageInfo.height
+        } catch {
+          // Ignore
+        }
       }
 
       // Upload with selected preset if exists
-      if (item.selectedPreset) {
-        const presetId = item.selectedPreset
+      if (shouldCompress) {
+        const presetId = item.selectedPreset as string
+        const baseName =
+          originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename
+
+        let dbRecordId: string | undefined
+
         const taskId = addTask({
           file,
           fileName: file.name,
@@ -230,7 +278,8 @@ export function ImageUploadDrawer({
           compressionEnabled: true,
           compressionPreset: presetId,
           originalSize: file.size,
-          isImage: true
+          isImage,
+          dbRecordId
         })
 
         try {
@@ -245,10 +294,31 @@ export function ImageUploadDrawer({
           })
 
           if (compressResult.success && compressResult.content) {
-            const ext = compressResult.format === 'jpeg' ? 'jpg' : compressResult.format || 'webp'
-            const baseName =
-              originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename
-            const filename = `${baseName}_${presetId}_${compressResult.width}x${compressResult.height}.${ext}`
+            const actualExt =
+              compressResult.format === 'jpeg' ? 'jpg' : compressResult.format || 'webp'
+            const filename = `${baseName}_${presetId}_${compressResult.width}x${compressResult.height}.${actualExt}`
+            const key = prefix ? `${prefix}${filename}` : filename
+
+            try {
+              const dbRecord = await createRecordMutation.mutateAsync({
+                providerId: provider.id,
+                bucket,
+                key,
+                name: filename,
+                type: 'file',
+                size: compressResult.compressedSize ?? file.size,
+                mimeType: `image/${compressResult.format || actualExt}`,
+                uploadSource: 'app',
+                isCompressed: true,
+                originalSize: file.size,
+                compressionPresetId: presetId,
+                status: 'uploading'
+              })
+              dbRecordId = dbRecord.id
+              updateTask(taskId, { dbRecordId })
+            } catch (error) {
+              console.error('[ImageUpload] Failed to create DB record:', error)
+            }
 
             updateTask(taskId, {
               status: 'uploading',
@@ -257,8 +327,6 @@ export function ImageUploadDrawer({
               height: compressResult.height,
               format: compressResult.format
             })
-
-            const key = prefix ? `${prefix}${filename}` : filename
 
             console.log('[ImageUpload] Uploading compressed image:', {
               bucket,
@@ -282,32 +350,94 @@ export function ImageUploadDrawer({
                 progress: 100,
                 outputKey: key
               })
+              // Update DB record status to completed
+              if (dbRecordId) {
+                await updateStatusMutation.mutateAsync({
+                  id: dbRecordId,
+                  status: 'completed'
+                })
+              }
             } else {
+              const errorMsg = result.error || 'Upload failed'
               updateTask(taskId, {
                 status: 'error',
-                error: result.error || 'Upload failed'
+                error: errorMsg
               })
+              // Update DB record status to error
+              if (dbRecordId) {
+                await updateStatusMutation.mutateAsync({
+                  id: dbRecordId,
+                  status: 'error',
+                  errorMessage: errorMsg
+                })
+              }
             }
           } else {
+            const errorMsg = compressResult.error || 'Compression failed'
             updateTask(taskId, {
               status: 'error',
-              error: compressResult.error || 'Compression failed'
+              error: errorMsg
             })
+            // Update DB record status to error
+            if (dbRecordId) {
+              await updateStatusMutation.mutateAsync({
+                id: dbRecordId,
+                status: 'error',
+                errorMessage: errorMsg
+              })
+            }
           }
         } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error'
           updateTask(taskId, {
             status: 'error',
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: errorMsg
           })
+          // Update DB record status to error
+          if (dbRecordId) {
+            await updateStatusMutation.mutateAsync({
+              id: dbRecordId,
+              status: 'error',
+              errorMessage: errorMsg
+            })
+          }
         }
       }
 
-      // Upload original if selected
-      if (keepOriginal) {
+      const shouldUploadOriginal = !shouldCompress || (keepOriginal && shouldCompress)
+
+      // Upload original if no preset is selected, or if keepOriginal is enabled
+      if (shouldUploadOriginal) {
         const baseName =
           originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename
         const ext = originalFilename.substring(originalFilename.lastIndexOf('.') + 1)
-        const filename = `${baseName}_original_${originalWidth}x${originalHeight}.${ext}`
+        const hasDimensions = typeof originalWidth === 'number' && typeof originalHeight === 'number'
+        const filename =
+          shouldCompress && isImage
+            ? `${baseName}_original${hasDimensions ? `_${originalWidth}x${originalHeight}` : ''}.${ext}`
+            : originalFilename
+        const key = prefix ? `${prefix}${filename}` : filename
+
+        // Create DB record first with 'uploading' status
+        let dbRecordId: string | undefined
+        try {
+          const dbRecord = await createRecordMutation.mutateAsync({
+            providerId: provider.id,
+            bucket,
+            key,
+            name: filename,
+            type: 'file',
+            size: file.size,
+            mimeType: originalContentType,
+            uploadSource: 'app',
+            isCompressed: false,
+            originalSize: file.size,
+            status: 'uploading'
+          })
+          dbRecordId = dbRecord.id
+        } catch (error) {
+          console.error('[ImageUpload] Failed to create DB record:', error)
+        }
 
         const taskId = addTask({
           file,
@@ -319,15 +449,14 @@ export function ImageUploadDrawer({
           status: 'uploading',
           progress: 0,
           compressionEnabled: false,
-          compressionPreset: 'original',
+          compressionPreset: isImage ? 'original' : undefined,
           originalSize: file.size,
-          isImage: true
+          isImage,
+          dbRecordId
         })
 
         try {
-          const key = prefix ? `${prefix}${filename}` : filename
-
-          console.log('[ImageUpload] Uploading original image:', {
+          console.log('[ImageUpload] Uploading original file:', {
             bucket,
             key,
             prefix,
@@ -348,25 +477,73 @@ export function ImageUploadDrawer({
               progress: 100,
               outputKey: key
             })
+            // Update DB record status to completed
+            if (dbRecordId) {
+              await updateStatusMutation.mutateAsync({
+                id: dbRecordId,
+                status: 'completed'
+              })
+            }
           } else {
+            const errorMsg = result.error || 'Upload failed'
             updateTask(taskId, {
               status: 'error',
-              error: result.error || 'Upload failed'
+              error: errorMsg
             })
+            // Update DB record status to error
+            if (dbRecordId) {
+              await updateStatusMutation.mutateAsync({
+                id: dbRecordId,
+                status: 'error',
+                errorMessage: errorMsg
+              })
+            }
           }
         } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error'
           updateTask(taskId, {
             status: 'error',
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: errorMsg
           })
+          // Update DB record status to error
+          if (dbRecordId) {
+            await updateStatusMutation.mutateAsync({
+              id: dbRecordId,
+              status: 'error',
+              errorMessage: errorMsg
+            })
+          }
         }
       }
 
       // Generate and upload BlurHash if selected
-      if (generateBlurHash) {
+      if (generateBlurHash && isImage) {
         const baseName =
           originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename
         const filename = `${baseName}_blurhash.webp`
+        const key = prefix ? `${prefix}${filename}` : filename
+
+        // Create DB record first with 'uploading' status
+        let dbRecordId: string | undefined
+        try {
+          const dbRecord = await createRecordMutation.mutateAsync({
+            providerId: provider.id,
+            bucket,
+            key,
+            name: filename,
+            type: 'file',
+            size: file.size,
+            mimeType: 'image/webp',
+            uploadSource: 'app',
+            isCompressed: true,
+            originalSize: file.size,
+            compressionPresetId: 'blurhash',
+            status: 'uploading'
+          })
+          dbRecordId = dbRecord.id
+        } catch (error) {
+          console.error('[ImageUpload] Failed to create DB record:', error)
+        }
 
         const taskId = addTask({
           file,
@@ -380,7 +557,8 @@ export function ImageUploadDrawer({
           compressionEnabled: true,
           compressionPreset: 'blurhash',
           originalSize: file.size,
-          isImage: true
+          isImage: true,
+          dbRecordId
         })
 
         try {
@@ -394,8 +572,6 @@ export function ImageUploadDrawer({
             width: blurResult.width,
             height: blurResult.height
           })
-
-          const key = prefix ? `${prefix}${filename}` : filename
 
           console.log('[ImageUpload] Uploading blurhash:', {
             bucket,
@@ -418,17 +594,42 @@ export function ImageUploadDrawer({
               progress: 100,
               outputKey: key
             })
+            // Update DB record status to completed
+            if (dbRecordId) {
+              await updateStatusMutation.mutateAsync({
+                id: dbRecordId,
+                status: 'completed'
+              })
+            }
           } else {
+            const errorMsg = result.error || 'Upload failed'
             updateTask(taskId, {
               status: 'error',
-              error: result.error || 'Upload failed'
+              error: errorMsg
             })
+            // Update DB record status to error
+            if (dbRecordId) {
+              await updateStatusMutation.mutateAsync({
+                id: dbRecordId,
+                status: 'error',
+                errorMessage: errorMsg
+              })
+            }
           }
         } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error'
           updateTask(taskId, {
             status: 'error',
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: errorMsg
           })
+          // Update DB record status to error
+          if (dbRecordId) {
+            await updateStatusMutation.mutateAsync({
+              id: dbRecordId,
+              status: 'error',
+              errorMessage: errorMsg
+            })
+          }
         }
       }
     }
@@ -437,8 +638,7 @@ export function ImageUploadDrawer({
     onUploadComplete?.()
   }
   const handleStartUpload = () => {
-    const hasValidPresets = imageItems.some((item) => item.selectedPreset !== null)
-    if (imageItems.length === 0 || (!hasValidPresets && !keepOriginal)) {
+    if (fileItems.length === 0) {
       return
     }
 
@@ -453,20 +653,19 @@ export function ImageUploadDrawer({
     processUploads()
   }
 
-  const hasValidPresets = imageItems.some((item) => item.selectedPreset !== null)
-  const canUpload = imageItems.length > 0 && (hasValidPresets || keepOriginal) && !isUploading
+  const canUpload = fileItems.length > 0 && !isUploading
 
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="p-0 flex flex-col min-w-[1000px]">
+        <SheetContent side="bottom" className="p-0 flex flex-col !h-[85vh] rounded-t-md">
           <SheetHeader className="p-4 pb-2">
             <SheetTitle className="flex items-center gap-2">
-              <IconPhoto size={20} className="text-blue-500" />
-              Upload Images
+              <IconUpload size={20} className="text-blue-500" />
+              Upload Files
             </SheetTitle>
             <SheetDescription>
-              {imageItems.length} image{imageItems.length !== 1 && 's'} selected
+              {fileItems.length} file{fileItems.length !== 1 && 's'} selected
             </SheetDescription>
           </SheetHeader>
 
@@ -482,11 +681,11 @@ export function ImageUploadDrawer({
               ) : (
                 <>
                   {/* Apply to All section */}
-                  <div className="flex items-center gap-2 p-3 rounded-md border bg-muted/30">
-                    <Label className="text-sm font-medium">Apply preset to all:</Label>
-                    <Select onValueChange={applyPresetToAll}>
+                  <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-3">
+                    <Label className="text-sm font-medium">Apply preset to all images:</Label>
+                    <Select onValueChange={applyPresetToAll} disabled={imageCount === 0}>
                       <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Select preset" />
+                        <SelectValue placeholder={imageCount === 0 ? 'No images' : 'Select preset'} />
                       </SelectTrigger>
                       <SelectContent>
                         {presets?.map((preset) => (
@@ -512,15 +711,19 @@ export function ImageUploadDrawer({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {imageItems.map((item, index) => (
+                        {fileItems.map((item, index) => (
                           <TableRow key={index}>
                             <TableCell>
-                              <div className="w-12 h-12 rounded-md overflow-hidden border bg-muted">
-                                <img
-                                  src={item.previewUrl}
-                                  alt={item.file.name}
-                                  className="w-full h-full object-cover"
-                                />
+                              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border bg-muted">
+                                {item.isImage ? (
+                                  <img
+                                    src={item.previewUrl}
+                                    alt={item.file.name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <IconFile size={18} className="text-muted-foreground" />
+                                )}
                               </div>
                             </TableCell>
                             <TableCell className="font-medium">{item.file.name}</TableCell>
@@ -531,9 +734,12 @@ export function ImageUploadDrawer({
                               <Select
                                 value={item.selectedPreset || undefined}
                                 onValueChange={(value) => updatePreset(index, value)}
+                                disabled={!item.isImage}
                               >
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select preset" />
+                                  <SelectValue
+                                    placeholder={item.isImage ? 'Select preset' : 'Not applicable'}
+                                  />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {presets?.map((preset) => (
@@ -545,7 +751,7 @@ export function ImageUploadDrawer({
                               </Select>
                             </TableCell>
                             <TableCell>
-                              {item.needsCrop && (
+                              {item.isImage && item.needsCrop ? (
                                 <Button
                                   variant={item.croppedContent ? 'default' : 'outline'}
                                   size="sm"
@@ -568,6 +774,8 @@ export function ImageUploadDrawer({
                                     </>
                                   )}
                                 </Button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">-</span>
                               )}
                             </TableCell>
                             <TableCell>
@@ -598,7 +806,7 @@ export function ImageUploadDrawer({
                     id="keep-original"
                     checked={keepOriginal}
                     onCheckedChange={setKeepOriginal}
-                    disabled={isUploading}
+                    disabled={isUploading || imageCount === 0}
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -610,12 +818,15 @@ export function ImageUploadDrawer({
                       Generate BlurHash
                     </Label>
                     <p className="text-xs text-muted-foreground">Small blurred placeholder image</p>
+                    <p className="text-xs text-muted-foreground">
+                      This file will also be uploaded.
+                    </p>
                   </div>
                   <Switch
                     id="generate-blurhash"
                     checked={generateBlurHash}
                     onCheckedChange={setGenerateBlurHash}
-                    disabled={isUploading}
+                    disabled={isUploading || imageCount === 0}
                   />
                 </div>
               </div>
@@ -627,10 +838,9 @@ export function ImageUploadDrawer({
                   <span className="font-medium text-foreground">{totalTasks} files</span>
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {hasValidPresets &&
-                    `${imageItems.filter((i) => i.selectedPreset).length} preset uploads`}
-                  {keepOriginal && ' + original'}
-                  {generateBlurHash && ' + blurhash'}
+                  {presetCount > 0 && `${presetCount} preset uploads`}
+                  {keepOriginal && presetCount > 0 && ' + originals'}
+                  {generateBlurHash && imageCount > 0 && ` + ${imageCount} blurhash`}
                 </p>
               </div>
             </div>

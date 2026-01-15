@@ -12,7 +12,7 @@ import {
 } from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { FileList } from '@renderer/components/file-browser/file-list'
-import { ImageUploadDrawer } from '@renderer/components/provider/image-upload-drawer'
+import { UploadFilesDrawer } from '@renderer/components/provider/upload-files-drawer'
 import { CreateFolderDialog } from '@renderer/components/provider/create-folder-dialog'
 import { DeleteConfirmDialog } from '@renderer/components/provider/delete-confirm-dialog'
 import { RenameDialog } from '@renderer/components/provider/rename-dialog'
@@ -20,16 +20,8 @@ import { MoveDialog } from '@renderer/components/provider/move-dialog'
 import { FileDetailSheet } from '@renderer/components/provider/file-detail-sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table'
+import { FileListSkeleton } from '@/components/ui/table-skeleton'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -57,62 +49,14 @@ interface BucketBrowserProps {
   bucket: string
 }
 
-function FileListSkeleton() {
-  return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/50">
-            <TableHead className="w-12">
-              <Skeleton className="h-4 w-4" />
-            </TableHead>
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              NAME
-            </TableHead>
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              SIZE
-            </TableHead>
-            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              LAST MODIFIED
-            </TableHead>
-            <TableHead className="w-24" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Array.from({ length: 8 }).map((_, i) => (
-            <TableRow key={i}>
-              <TableCell className="w-12">
-                <Skeleton className="h-4 w-4" />
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-4 w-4" />
-                  <Skeleton className="h-4 w-48" />
-                </div>
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-4 w-16" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-4 w-24" />
-              </TableCell>
-              <TableCell className="w-24" />
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  )
-}
-
 export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
   // Use navigation store for path management
   const { currentPath: path, setPath } = useNavigationStore()
 
   const [cursor, setCursor] = useState<string | undefined>(undefined)
   const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([])
-  const [imageUploadDrawerOpen, setImageUploadDrawerOpen] = useState(false)
-  const [selectedImageFiles, setSelectedImageFiles] = useState<File[]>([])
+  const [uploadDrawerOpen, setUploadDrawerOpen] = useState(false)
+  const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([])
   const [createFolderDialogOpen, setCreateFolderDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
@@ -299,27 +243,10 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
     }
   }
 
-  // Check if file is an image
-  const isImageFile = (file: File): boolean => {
-    return (
-      file.type.startsWith('image/') &&
-      ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'].includes(
-        file.type.toLowerCase()
-      )
-    )
-  }
-
   // Upload drop zone handlers
   const handleUploadFiles = (files: File[]) => {
-    // Check if any files are images
-    const imageFiles = files.filter(isImageFile)
-
-    if (imageFiles.length > 0) {
-      // Open image upload drawer for image files
-      setSelectedImageFiles(imageFiles)
-      setImageUploadDrawerOpen(true)
-    }
-    // TODO: Handle non-image files with direct upload
+    setSelectedUploadFiles(files)
+    setUploadDrawerOpen(true)
   }
 
   const handleDropZoneDragOver = (e: React.DragEvent) => {
@@ -546,10 +473,10 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
       )}
 
       {/* Dialogs */}
-      <ImageUploadDrawer
-        open={imageUploadDrawerOpen}
-        onOpenChange={setImageUploadDrawerOpen}
-        files={selectedImageFiles}
+      <UploadFilesDrawer
+        open={uploadDrawerOpen}
+        onOpenChange={setUploadDrawerOpen}
+        files={selectedUploadFiles}
         provider={provider}
         bucket={bucket}
         prefix={prefix}
@@ -557,11 +484,11 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
           console.log('[BucketBrowser] Upload started:', {
             bucket,
             prefix,
-            fileCount: selectedImageFiles.length,
+            fileCount: selectedUploadFiles.length,
             path
           })
           // Close dialogs and clear selection on upload start
-          setSelectedImageFiles([])
+          setSelectedUploadFiles([])
         }}
         onUploadComplete={() => {
           console.log('[BucketBrowser] Upload completed, refreshing...')

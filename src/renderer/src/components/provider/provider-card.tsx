@@ -5,6 +5,16 @@ import type { TRPCProvider } from '@renderer/lib/trpc'
 import { trpc } from '@renderer/lib/trpc'
 import { useProviderStatus } from '@renderer/hooks/use-provider-status'
 import { cn } from '@/lib/utils'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -54,6 +64,7 @@ function formatLastOperation(date: Date | string | null | undefined): string {
 
 export function ProviderCard({ provider }: ProviderCardProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const { isLoading, isConnected, stats } = useProviderStatus(provider)
   const utils = trpc.useUtils()
 
@@ -73,9 +84,8 @@ export function ProviderCard({ provider }: ProviderCardProps) {
   const statusText = isLoading ? 'Checking...' : isConnected ? 'Connected' : 'Paused'
 
   const handleDelete = () => {
-    if (confirm(`Are you sure you want to delete "${provider.name}"? This action cannot be undone.`)) {
-      deleteMutation.mutate({ id: provider.id })
-    }
+    deleteMutation.mutate({ id: provider.id })
+    setDeleteDialogOpen(false)
   }
 
   const iconKey = getProviderIconKey(provider)
@@ -167,7 +177,7 @@ export function ProviderCard({ provider }: ProviderCardProps) {
                   variant="destructive"
                   onClick={(e) => {
                     e.preventDefault()
-                    handleDelete()
+                    setDeleteDialogOpen(true)
                   }}
                 >
                   Delete
@@ -183,6 +193,23 @@ export function ProviderCard({ provider }: ProviderCardProps) {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Provider</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{provider.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

@@ -63,7 +63,7 @@ export function FileDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[400px] sm:max-w-[400px]">
+      <SheetContent side="bottom" className="h-[70vh] rounded-t-md">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             {getFileIcon(file, 'small')}

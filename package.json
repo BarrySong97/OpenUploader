@@ -33,6 +33,7 @@
     "@trpc/client": "^11.8.1",
     "@trpc/server": "^11.8.1",
     "ali-oss": "^6.23.0",
+    "blurhash": "^2.0.5",
     "cos-nodejs-sdk-v5": "^2.15.4",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.1",

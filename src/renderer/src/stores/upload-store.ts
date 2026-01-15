@@ -24,6 +24,8 @@ export interface UploadTask {
   width?: number
   height?: number
   format?: string
+  // Database record ID for syncing with upload history
+  dbRecordId?: string
 }
 
 interface UploadStore {

@@ -14,7 +14,41 @@ export type { UploadHistoryRecord } from '@main/db/schema'
  */
 export const uploadHistoryService = {
   /**
-   * Record a file upload
+   * Create a new upload record (returns the created record with id)
+   */
+  async createRecord(params: {
+    providerId: string
+    bucket: string
+    key: string
+    name: string
+    type: 'file' | 'folder'
+    size?: number
+    mimeType?: string
+    uploadSource?: string
+    isCompressed?: boolean
+    originalSize?: number
+    compressionPresetId?: string
+    status?: 'uploading' | 'completed' | 'error'
+    errorMessage?: string
+  }) {
+    try {
+      const record = await uploadHistoryRepository.create(params)
+      console.log('[uploadHistoryService] Upload record created:', {
+        id: record.id,
+        providerId: params.providerId,
+        bucket: params.bucket,
+        key: params.key,
+        status: params.status || 'completed'
+      })
+      return record
+    } catch (error) {
+      console.error('[uploadHistoryService] Failed to create upload record:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Record a file upload (legacy method, creates with 'completed' status)
    */
   async recordUpload(params: {
     providerId: string
@@ -39,6 +73,28 @@ export const uploadHistoryService = {
     } catch (error) {
       // Log error but don't throw - recording upload history should not break the main flow
       console.error('[uploadHistoryService] Failed to record upload:', error)
+    }
+  },
+
+  /**
+   * Update upload status
+   */
+  async updateStatus(
+    id: string,
+    status: 'uploading' | 'completed' | 'error',
+    errorMessage?: string
+  ) {
+    try {
+      const updated = await uploadHistoryRepository.updateStatus(id, status, errorMessage)
+      console.log('[uploadHistoryService] Upload status updated:', {
+        id,
+        status,
+        errorMessage
+      })
+      return updated
+    } catch (error) {
+      console.error('[uploadHistoryService] Failed to update upload status:', error)
+      throw error
     }
   },
 

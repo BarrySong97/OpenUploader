@@ -36,8 +36,8 @@ export function UploadManagerDrawer() {
 
   return (
     <Sheet open={isDrawerOpen} onOpenChange={setDrawerOpen}>
-      <SheetContent side="right" className="min-w-[800px]  p-0 flex flex-col">
-        <SheetHeader className="p-4 pb-0">
+      <SheetContent side="bottom" className="p-0 flex flex-col !h-[90vh] rounded-t-md">
+        <SheetHeader className="p-4 pb-0 pr-12">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <IconCloudUpload size={20} className="text-muted-foreground" />
@@ -74,26 +74,58 @@ export function UploadManagerDrawer() {
               <p className="text-xs text-muted-foreground mt-1">Drop files to start uploading</p>
             </div>
           ) : (
-            <div className="divide-y divide-border">
-              {/* Active tasks first */}
-              {activeTasks.map((task) => (
-                <UploadTaskItem key={task.id} task={task} onRemove={removeTask} />
-              ))}
+            <div className="space-y-3 p-2">
+              {activeTasks.length > 0 && (
+                <div className="overflow-hidden rounded-md border">
+                  <div className="bg-muted/40 px-3 py-1 text-xs font-semibold uppercase text-muted-foreground">
+                    Active ({activeTasks.length})
+                  </div>
+                  <div className="divide-y divide-border">
+                    {activeTasks.map((task) => (
+                      <UploadTaskItem key={task.id} task={task} onRemove={removeTask} />
+                    ))}
+                  </div>
+                </div>
+              )}
 
-              {/* Pending tasks */}
-              {pendingTasks.map((task) => (
-                <UploadTaskItem key={task.id} task={task} onRemove={removeTask} />
-              ))}
+              {pendingTasks.length > 0 && (
+                <div className="overflow-hidden rounded-md border">
+                  <div className="bg-muted/40 px-3 py-1 text-xs font-semibold uppercase text-muted-foreground">
+                    Pending ({pendingTasks.length})
+                  </div>
+                  <div className="divide-y divide-border">
+                    {pendingTasks.map((task) => (
+                      <UploadTaskItem key={task.id} task={task} onRemove={removeTask} />
+                    ))}
+                  </div>
+                </div>
+              )}
 
-              {/* Error tasks */}
-              {errorTasks.map((task) => (
-                <UploadTaskItem key={task.id} task={task} onRemove={removeTask} />
-              ))}
+              {errorTasks.length > 0 && (
+                <div className="overflow-hidden rounded-md border">
+                  <div className="bg-muted/40 px-3 py-1 text-xs font-semibold uppercase text-muted-foreground">
+                    Failed ({errorTasks.length})
+                  </div>
+                  <div className="divide-y divide-border">
+                    {errorTasks.map((task) => (
+                      <UploadTaskItem key={task.id} task={task} onRemove={removeTask} />
+                    ))}
+                  </div>
+                </div>
+              )}
 
-              {/* Completed tasks */}
-              {completedTasks.map((task) => (
-                <UploadTaskItem key={task.id} task={task} onRemove={removeTask} />
-              ))}
+              {completedTasks.length > 0 && (
+                <div className="overflow-hidden rounded-md border">
+                  <div className="bg-muted/40 px-3 py-1 text-xs font-semibold uppercase text-muted-foreground">
+                    Completed ({completedTasks.length})
+                  </div>
+                  <div className="divide-y divide-border">
+                    {completedTasks.map((task) => (
+                      <UploadTaskItem key={task.id} task={task} onRemove={removeTask} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </ScrollArea>

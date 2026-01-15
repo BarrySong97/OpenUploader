@@ -16,6 +16,8 @@ export interface CreateUploadRecordInput {
   isCompressed?: boolean
   originalSize?: number
   compressionPresetId?: string
+  status?: 'uploading' | 'completed' | 'error'
+  errorMessage?: string
 }
 
 export interface ListUploadsParams {
@@ -68,7 +70,9 @@ export const uploadHistoryRepository = {
       uploadSource: input.uploadSource ?? 'app',
       isCompressed: input.isCompressed ?? false,
       originalSize: input.originalSize ?? null,
-      compressionPresetId: input.compressionPresetId ?? null
+      compressionPresetId: input.compressionPresetId ?? null,
+      status: input.status ?? 'completed',
+      errorMessage: input.errorMessage ?? null
     }
 
     const [created] = await db.insert(schema.uploadHistory).values(record).returning()
@@ -253,6 +257,27 @@ export const uploadHistoryRepository = {
       )
       .returning()
     return result.length
+  },
+
+  /**
+   * Update upload status
+   */
+  async updateStatus(
+    id: string,
+    status: 'uploading' | 'completed' | 'error',
+    errorMessage?: string
+  ): Promise<UploadHistoryRecord | null> {
+    const db = getDatabase()
+    const [updated] = await db
+      .update(schema.uploadHistory)
+      .set({
+        status,
+        errorMessage: errorMessage ?? null,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.uploadHistory.id, id))
+      .returning()
+    return updated || null
   },
 
   /**

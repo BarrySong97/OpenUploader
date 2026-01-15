@@ -75,6 +75,8 @@ export const uploadHistory = pgTable(
     isCompressed: boolean('is_compressed').default(false),
     originalSize: integer('original_size'),
     compressionPresetId: text('compression_preset_id'),
+    status: text('status').notNull().default('completed'), // 'uploading' | 'completed' | 'error'
+    errorMessage: text('error_message'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
   },

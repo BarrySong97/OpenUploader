@@ -8,6 +8,13 @@
       "when": 1768448376160,
       "tag": "0000_low_namora",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1768458651210,
+      "tag": "0001_quick_justice",
+      "breakpoints": true
     }
   ]
 }

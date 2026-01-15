@@ -15,8 +15,9 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+
+export { BucketTableSkeleton } from '@/components/ui/table-skeleton'
 
 export interface BucketInfo {
   name: string
@@ -28,40 +29,6 @@ interface BucketTableProps {
   onBucketClick?: (bucket: BucketInfo) => void
   onBucketDelete?: (bucket: BucketInfo) => void
   pageSize?: number
-}
-
-export function BucketTableSkeleton() {
-  return (
-    <div className="">
-      <Table className="">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-1/2">BUCKET NAME</TableHead>
-            <TableHead>CREATED DATE</TableHead>
-            <TableHead className="w-32 text-right">ACTIONS</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <TableRow key={i}>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-4 w-4" />
-                  <Skeleton className="h-4 w-32" />
-                </div>
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-4 w-24" />
-              </TableCell>
-              <TableCell className="text-right">
-                <Skeleton className="ml-auto h-4 w-20" />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  )
 }
 
 export function BucketTable({

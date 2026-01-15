@@ -83,13 +83,19 @@ function ProviderDetailSkeleton() {
       </div>
 
       {/* Bucket List Skeleton */}
-      <div>
+      <section>
         <div className="mb-4 flex items-center justify-between">
-          <Skeleton className="h-7 w-32" />
-          <Skeleton className="h-9 w-32" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-7 w-24" />
+            <Skeleton className="h-5 w-8 rounded-full" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-9 w-24" />
+            <Skeleton className="h-9 w-32" />
+          </div>
         </div>
         <BucketTableSkeleton />
-      </div>
+      </section>
     </PageLayout>
   )
 }

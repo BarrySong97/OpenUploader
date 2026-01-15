@@ -4,7 +4,10 @@ import {
   IconFolder,
   IconPhoto,
   IconUpload,
-  IconCloud
+  IconCloud,
+  IconHistory,
+  IconCloudShare,
+  IconCategoryFilled
 } from '@tabler/icons-react'
 
 // 菜单项类型定义
@@ -21,19 +24,19 @@ export const MENU_ITEMS = {
     id: 'dashboard',
     path: '/',
     label: 'Dashboard',
-    icon: IconLayoutDashboard
+    icon: IconCategoryFilled
   },
   uploadHistory: {
     id: 'upload-history',
     path: '/my-uploads',
     label: 'Upload History',
-    icon: IconUpload
+    icon: IconHistory
   },
   providers: {
     id: 'providers',
     path: '/providers',
     label: 'Providers',
-    icon: IconCloud
+    icon: IconCloudShare
   },
   settings: {
     id: 'settings',
