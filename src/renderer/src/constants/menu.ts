@@ -4,7 +4,8 @@ import {
   IconPhoto,
   IconHistory,
   IconCloudShare,
-  IconCategoryFilled
+  IconCategoryFilled,
+  IconDatabase
 } from '@tabler/icons-react'
 
 // 菜单项类型定义
@@ -46,7 +47,8 @@ export const MENU_ITEMS = {
 // Settings 子路由（仅用于 breadcrumb）
 export const SETTINGS_SUB_ROUTES: MenuItem[] = [
   { id: 'providers', path: '/settings/providers', label: 'Providers', icon: IconFolder },
-  { id: 'compression', path: '/settings/compression', label: 'Image Compression', icon: IconPhoto }
+  { id: 'compression', path: '/settings/compression', label: 'Image Compression', icon: IconPhoto },
+  { id: 'database', path: '/settings/database', label: 'Database Storage', icon: IconDatabase }
 ]
 
 // 辅助函数：根据路径查找菜单项

@@ -40,6 +40,15 @@ function SettingsLayout() {
             >
               Image Compression
             </Link>
+            <Link
+              to="/settings/database"
+              className={cn(
+                'block rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent',
+                isActive('/settings/database') && 'bg-accent text-accent-foreground'
+              )}
+            >
+              Database Storage
+            </Link>
           </div>
         </nav>
 
