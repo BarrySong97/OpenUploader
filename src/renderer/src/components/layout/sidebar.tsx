@@ -23,6 +23,7 @@ import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
 import { MENU_ITEMS } from '@renderer/constants/menu'
 import { ProviderBrandIcon, getProviderIconKey } from '@/components/provider/brand-icon'
 import { StreamlinePlumpModule } from './icon'
+import { useLocalStorageState } from 'ahooks'
 
 // Active indicator component - green color, positioned at sidebar edge
 function ActiveIndicator() {
@@ -102,7 +103,9 @@ export function AppSidebar() {
 
   // Get recent providers (limit to MAX_RECENT_PROVIDERS)
   const recentProviders = providers?.slice(0, MAX_RECENT_PROVIDERS) ?? []
-
+  const [sidebarOpen, setSidebarOpen] = useLocalStorageState('sidebar-open', {
+    defaultValue: true
+  })
   return (
     <>
       <Sidebar collapsible="icon" className="!border-none">

@@ -17,7 +17,7 @@ export const Route = createRootRoute({
 
     return (
       <TooltipProvider>
-        <SidebarProvider defaultOpen={sidebarOpen ?? true} onOpenChange={setSidebarOpen}>
+        <SidebarProvider defaultOpen={sidebarOpen} open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <AppSidebar />
           <SidebarInset className="flex flex-col overflow-hidden bg-[#f2f8f3bf]">
             <div className="h-[30px] fixed right-0 w-[120px] draggable z-50" />

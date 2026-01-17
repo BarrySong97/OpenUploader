@@ -15,7 +15,8 @@ const api = {
     isLinux: process.platform === 'linux',
     name: process.platform
   },
-  showInFolder: (filePath: string) => ipcRenderer.invoke('show-in-folder', filePath)
+  showInFolder: (filePath: string) => ipcRenderer.invoke('show-in-folder', filePath),
+  getDatabasePath: () => ipcRenderer.invoke('get-database-path')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

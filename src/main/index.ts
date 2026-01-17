@@ -6,14 +6,14 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createIPCHandler } from 'trpc-electron/main'
 import icon from '../../resources/icon.png?asset'
 import { appRouter } from './trpc/router'
-import { initDatabase } from './db'
+import { initDatabase, getDatabasePath } from './db'
 import { initializeBuiltInPresets } from './services/preset-service'
 
 function createWindow(): BrowserWindow {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1376,
+    height: 870,
     show: false,
     titleBarStyle: 'hidden',
     vibrancy: 'under-window',
@@ -81,6 +81,10 @@ app.whenReady().then(async () => {
   // Show item in folder
   ipcMain.handle('show-in-folder', (_event, filePath: string) => {
     shell.showItemInFolder(filePath)
+  })
+
+  ipcMain.handle('get-database-path', () => {
+    return getDatabasePath()
   })
 
   const mainWindow = createWindow()

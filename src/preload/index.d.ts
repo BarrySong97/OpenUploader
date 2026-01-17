@@ -12,6 +12,7 @@ declare global {
         name: NodeJS.Platform
       }
       showInFolder: (filePath: string) => Promise<void>
+      getDatabasePath: () => Promise<string>
     }
     electronTRPC: ElectronTRPC
   }
