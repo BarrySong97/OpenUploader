@@ -2,7 +2,7 @@ import { resolve } from 'path'
 import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
+import TanStackRouter from '@tanstack/router-plugin/vite'
 
 export default defineConfig({
   main: {
@@ -31,6 +31,6 @@ export default defineConfig({
         '@shared': resolve('src/shared')
       }
     },
-    plugins: [TanStackRouterVite(), react(), tailwindcss()]
+    plugins: [TanStackRouter(), react(), tailwindcss()]
   }
 })

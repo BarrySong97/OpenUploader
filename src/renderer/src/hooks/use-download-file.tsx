@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
+import { useDownloadStore } from '@renderer/stores/download-store'
 
 interface UseDownloadFileOptions {
   provider: TRPCProvider
@@ -10,33 +11,44 @@ interface UseDownloadFileOptions {
 interface DownloadParams {
   key: string
   fileName: string
+  fileSize?: number
 }
 
 export function useDownloadFile({ provider, bucket }: UseDownloadFileOptions) {
   const [isDownloading, setIsDownloading] = useState(false)
+  const addTask = useDownloadStore((state) => state.addTask)
+  const updateTask = useDownloadStore((state) => state.updateTask)
+  const setDrawerOpen = useDownloadStore((state) => state.setDrawerOpen)
 
   const showSaveDialogMutation = trpc.provider.showSaveDialog.useMutation()
   const downloadToFileMutation = trpc.provider.downloadToFile.useMutation()
 
   const downloadFile = useCallback(
-    async ({ key, fileName }: DownloadParams) => {
+    async ({ key, fileName, fileSize = 0 }: DownloadParams) => {
       if (isDownloading) return
 
       setIsDownloading(true)
 
+      const taskId = addTask({
+        key,
+        fileName,
+        fileSize,
+        providerId: provider.id,
+        bucket,
+        status: 'downloading'
+      })
+
       try {
-        // Step 1: Show save dialog with default file name
         const dialogResult = await showSaveDialogMutation.mutateAsync({
           defaultName: fileName
         })
 
-        // Step 2: Handle cancellation gracefully
         if (dialogResult.canceled || !dialogResult.filePath) {
-          setIsDownloading(false)
+          updateTask(taskId, { status: 'error', error: 'Download canceled' })
+          setDrawerOpen(true)
           return
         }
 
-        // Step 3: Download file to selected path
         const downloadResult = await downloadToFileMutation.mutateAsync({
           provider,
           bucket,
@@ -44,10 +56,16 @@ export function useDownloadFile({ provider, bucket }: UseDownloadFileOptions) {
           savePath: dialogResult.filePath
         })
 
-        // Step 4: Show appropriate toast
         if (downloadResult.success && downloadResult.filePath) {
           const filePath = downloadResult.filePath
+          updateTask(taskId, {
+            status: 'completed',
+            completedAt: Date.now(),
+            filePath
+          })
+          setDrawerOpen(true)
           toast.success('Download complete', {
+            icon: null,
             description: (
               <div className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground break-all">{filePath}</span>
@@ -64,11 +82,19 @@ export function useDownloadFile({ provider, bucket }: UseDownloadFileOptions) {
             )
           })
         } else {
+          updateTask(taskId, {
+            status: 'error',
+            error: downloadResult.error || 'Download failed'
+          })
           toast.error('Download failed', {
             description: downloadResult.error || 'An unknown error occurred'
           })
         }
       } catch (error) {
+        updateTask(taskId, {
+          status: 'error',
+          error: error instanceof Error ? error.message : 'An unknown error occurred'
+        })
         toast.error('Download failed', {
           description: error instanceof Error ? error.message : 'An unknown error occurred'
         })
@@ -76,7 +102,16 @@ export function useDownloadFile({ provider, bucket }: UseDownloadFileOptions) {
         setIsDownloading(false)
       }
     },
-    [provider, bucket, isDownloading, showSaveDialogMutation, downloadToFileMutation]
+    [
+      addTask,
+      updateTask,
+      setDrawerOpen,
+      provider,
+      bucket,
+      isDownloading,
+      showSaveDialogMutation,
+      downloadToFileMutation
+    ]
   )
 
   return {

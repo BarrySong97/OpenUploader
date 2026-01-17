@@ -11,9 +11,12 @@ export type Database = ReturnType<typeof drizzle<typeof schema>>
 let db: Database | null = null
 
 export async function initDatabase(): Promise<Database> {
-  const dbPath = path.join(app.getPath('userData'), 'pglite-db')
+  const appEnv = process.env.APP_ENV ?? 'dev'
+  const dbName = `pglite-db-${appEnv}`
+  const dbPath = path.join(app.getPath('userData'), dbName)
   console.log('PGlite database path:', dbPath)
   const client = new PGlite(dbPath)
+
   db = drizzle({ client, schema })
 
   // Get migrations folder path (different in dev vs production)

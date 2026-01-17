@@ -1,10 +1,7 @@
 import {
-  IconLayoutDashboard,
   IconSettings,
   IconFolder,
   IconPhoto,
-  IconUpload,
-  IconCloud,
   IconHistory,
   IconCloudShare,
   IconCategoryFilled

@@ -17,10 +17,12 @@ import {
   deleteBucketInputSchema,
   listBucketsInputSchema,
   showSaveDialogInputSchema,
+  showOpenDirectoryInputSchema,
   downloadToFileInputSchema,
   getPlainObjectUrlInputSchema,
   showInFolderInputSchema
 } from '@shared/schema/trpc/provider'
+
 import {
   testConnection,
   getProviderStats,
@@ -170,13 +172,24 @@ export const providerRouter = router({
   }),
 
   showSaveDialog: publicProcedure.input(showSaveDialogInputSchema).mutation(async ({ input }) => {
-    const window = BrowserWindow.getFocusedWindow()
-    const result = await dialog.showSaveDialog(window!, {
+    const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+    const result = await dialog.showSaveDialog(window ?? undefined, {
       defaultPath: input.defaultName,
       filters: [{ name: 'All Files', extensions: ['*'] }]
     })
     return { canceled: result.canceled, filePath: result.filePath || '' }
   }),
+
+  showOpenDirectory: publicProcedure
+    .input(showOpenDirectoryInputSchema)
+    .mutation(async ({ input }) => {
+      const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+      const result = await dialog.showOpenDialog(window ?? undefined, {
+        title: input.title ?? 'Select folder',
+        properties: ['openDirectory', 'createDirectory']
+      })
+      return { canceled: result.canceled, folderPath: result.filePaths[0] || '' }
+    }),
 
   downloadToFile: publicProcedure.input(downloadToFileInputSchema).mutation(async ({ input }) => {
     return downloadToFile(input)

@@ -6,9 +6,9 @@ import {
   IconCloudUpload,
   IconFolderPlus,
   IconSearch,
-  IconX,
   IconTrash,
-  IconChevronRight
+  IconChevronRight,
+  IconDownload
 } from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { FileList } from '@renderer/components/file-browser/file-list'
@@ -42,7 +42,9 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import type { FileItem } from '@/lib/types'
+import { toast } from '@/hooks/use-toast'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
+import { useDownloadStore } from '@renderer/stores/download-store'
 import { useDownloadFile } from '@/hooks/use-download-file'
 
 interface BucketBrowserProps {
@@ -71,6 +73,7 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
   const [appliedSearch, setAppliedSearch] = useState('')
   const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false)
   const [batchMoveDialogOpen, setBatchMoveDialogOpen] = useState(false)
+  const [isBatchDownloading, setIsBatchDownloading] = useState(false)
   // Upload drop zone state
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -78,7 +81,10 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
   const trpcUtils = trpc.useUtils()
   const moveObjectsMutation = trpc.provider.moveObjects.useMutation()
   const deleteObjectsMutation = trpc.provider.deleteObjects.useMutation()
+  const showOpenDirectoryMutation = trpc.provider.showOpenDirectory.useMutation()
+  const downloadToFileMutation = trpc.provider.downloadToFile.useMutation()
   const { downloadFile } = useDownloadFile({ provider, bucket })
+  const { addTask, updateTask, setDrawerOpen: setDownloadDrawerOpen } = useDownloadStore()
 
   // Build prefix from path segments
   const prefix = useMemo(() => {
@@ -146,7 +152,100 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
   }
 
   const handleDownload = (file: FileItem) => {
-    downloadFile({ key: file.id, fileName: file.name })
+    downloadFile({ key: file.id, fileName: file.name, fileSize: file.size || 0 })
+  }
+
+  const buildSavePath = (directory: string, fileName: string) => {
+    const separator = window.api.platform.isWindows ? '\\' : '/'
+    const trimmed = directory.replace(/[\\/]+$/, '')
+    return `${trimmed}${separator}${fileName}`
+  }
+
+  const handleBatchDownload = async () => {
+    if (selectedIds.size === 0 || isBatchDownloading) return
+    const selectedFiles = filteredFiles.filter(
+      (file) => selectedIds.has(file.id) && file.type === 'file'
+    )
+    if (selectedFiles.length === 0) {
+      toast({
+        title: 'Download unavailable',
+        description: 'Only files can be downloaded.'
+      })
+      return
+    }
+
+    try {
+      setIsBatchDownloading(true)
+      const dialogResult = await showOpenDirectoryMutation.mutateAsync({
+        title: 'Select download folder'
+      })
+      if (dialogResult.canceled || !dialogResult.folderPath) {
+        if (dialogResult.canceled) {
+          return
+        }
+        toast({
+          title: 'Download failed',
+          description: 'Could not open the folder picker.',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      setDownloadDrawerOpen(true)
+
+      const queue = [...selectedFiles]
+      const concurrency = 3
+      const workers = Array.from({ length: Math.min(concurrency, queue.length) }).map(async () => {
+        while (queue.length > 0) {
+          const nextFile = queue.shift()
+          if (!nextFile) return
+          const taskId = addTask({
+            key: nextFile.id,
+            fileName: nextFile.name,
+            fileSize: nextFile.size || 0,
+            providerId: provider.id,
+            bucket,
+            status: 'downloading'
+          })
+          try {
+            const savePath = buildSavePath(dialogResult.folderPath, nextFile.name)
+            const result = await downloadToFileMutation.mutateAsync({
+              provider,
+              bucket,
+              key: nextFile.id,
+              savePath
+            })
+            if (result.success && result.filePath) {
+              updateTask(taskId, {
+                status: 'completed',
+                completedAt: Date.now(),
+                filePath: result.filePath
+              })
+            } else {
+              updateTask(taskId, {
+                status: 'error',
+                error: result.error || 'Download failed'
+              })
+            }
+          } catch (error) {
+            updateTask(taskId, {
+              status: 'error',
+              error: error instanceof Error ? error.message : 'Download failed'
+            })
+          }
+        }
+      })
+
+      await Promise.all(workers)
+    } catch (error) {
+      toast({
+        title: 'Download failed',
+        description: error instanceof Error ? error.message : 'Unable to download files.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsBatchDownloading(false)
+    }
   }
 
   const handleCopyUrl = async (file: FileItem): Promise<string> => {
@@ -455,8 +554,22 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
       {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in slide-in-from-bottom-4">
           <div className="flex items-center gap-3 rounded-full border border-border bg-background px-4 py-2 shadow-lg">
-            <span className="text-sm font-medium">{selectedIds.size} files selected</span>
+            <span className="text-sm font-medium">{selectedIds.size} items selected</span>
             <Separator orientation="vertical" className="h-5" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBatchDownload}
+              disabled={
+                isBatchDownloading ||
+                selectedIds.size === 0 ||
+                filteredFiles.every((file) => !selectedIds.has(file.id) || file.type !== 'file')
+              }
+              className="h-8"
+            >
+              <IconDownload size={16} className="mr-1" />
+              Download
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -468,11 +581,11 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
             </Button>
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
               onClick={() => setSelectedIds(new Set())}
-              className="h-8 w-8"
+              className="h-8"
             >
-              <IconX size={16} />
+              Cancel
             </Button>
           </div>
         </div>

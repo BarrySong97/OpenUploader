@@ -88,6 +88,10 @@ export const showSaveDialogInputSchema = z.object({
   defaultName: z.string()
 })
 
+export const showOpenDirectoryInputSchema = z.object({
+  title: z.string().optional()
+})
+
 export const downloadToFileInputSchema = z.object({
   provider: providerSchema,
   bucket: z.string(),
@@ -122,6 +126,7 @@ export type CreateBucketInput = z.infer<typeof createBucketInputSchema>
 export type DeleteBucketInput = z.infer<typeof deleteBucketInputSchema>
 export type ListBucketsInput = z.infer<typeof listBucketsInputSchema>
 export type ShowSaveDialogInput = z.infer<typeof showSaveDialogInputSchema>
+export type ShowOpenDirectoryInput = z.infer<typeof showOpenDirectoryInputSchema>
 export type DownloadToFileInput = z.infer<typeof downloadToFileInputSchema>
 export type GetPlainObjectUrlInput = z.infer<typeof getPlainObjectUrlInputSchema>
 export type ShowInFolderInput = z.infer<typeof showInFolderInputSchema>

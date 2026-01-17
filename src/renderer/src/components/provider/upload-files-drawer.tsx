@@ -154,13 +154,13 @@ export function UploadFilesDrawer({
       prev.map((item, i) =>
         i === index
           ? item.isImage
-          ? {
-              ...item,
-              selectedPreset: presetId,
-              needsCrop: !!preset?.aspectRatio,
-              croppedContent: preset?.aspectRatio ? item.croppedContent : null
-            }
-          : item
+            ? {
+                ...item,
+                selectedPreset: presetId,
+                needsCrop: !!preset?.aspectRatio,
+                croppedContent: preset?.aspectRatio ? item.croppedContent : null
+              }
+            : item
           : item
       )
     )
@@ -225,10 +225,7 @@ export function UploadFilesDrawer({
     return count
   }, [fileItems, keepOriginal, generateBlurHash])
 
-  const imageCount = useMemo(
-    () => fileItems.filter((item) => item.isImage).length,
-    [fileItems]
-  )
+  const imageCount = useMemo(() => fileItems.filter((item) => item.isImage).length, [fileItems])
 
   const presetCount = useMemo(
     () => fileItems.filter((item) => item.isImage && item.selectedPreset !== null).length,
@@ -411,7 +408,8 @@ export function UploadFilesDrawer({
         const baseName =
           originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename
         const ext = originalFilename.substring(originalFilename.lastIndexOf('.') + 1)
-        const hasDimensions = typeof originalWidth === 'number' && typeof originalHeight === 'number'
+        const hasDimensions =
+          typeof originalWidth === 'number' && typeof originalHeight === 'number'
         const filename =
           shouldCompress && isImage
             ? `${baseName}_original${hasDimensions ? `_${originalWidth}x${originalHeight}` : ''}.${ext}`
@@ -658,7 +656,7 @@ export function UploadFilesDrawer({
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="p-0 flex flex-col !h-[85vh] rounded-t-md">
+        <SheetContent side="bottom" className="p-0 flex min-h-0 flex-col !h-[85vh] rounded-t-md">
           <SheetHeader className="p-4 pb-2">
             <SheetTitle className="flex items-center gap-2">
               <IconUpload size={20} className="text-blue-500" />
@@ -669,7 +667,7 @@ export function UploadFilesDrawer({
             </SheetDescription>
           </SheetHeader>
 
-          <ScrollArea className="flex-1 px-4">
+          <ScrollArea className="min-h-0 flex-1 px-4">
             <div className="space-y-4 pb-4">
               {/* Image table */}
               {presetsLoading ? (
@@ -685,7 +683,9 @@ export function UploadFilesDrawer({
                     <Label className="text-sm font-medium">Apply preset to all images:</Label>
                     <Select onValueChange={applyPresetToAll} disabled={imageCount === 0}>
                       <SelectTrigger className="w-48">
-                        <SelectValue placeholder={imageCount === 0 ? 'No images' : 'Select preset'} />
+                        <SelectValue
+                          placeholder={imageCount === 0 ? 'No images' : 'Select preset'}
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {presets?.map((preset) => (

@@ -1,5 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
+
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createIPCHandler } from 'trpc-electron/main'
 import icon from '../../resources/icon.png?asset'
@@ -46,7 +48,8 @@ function createWindow(): BrowserWindow {
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    const indexUrl = pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
+    mainWindow.loadURL(`${indexUrl}#/`)
   }
 
   return mainWindow

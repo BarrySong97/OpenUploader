@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { UploadHistoryTableSkeleton } from '@/components/ui/table-skeleton'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,6 +87,7 @@ function MyUploadsPage() {
   >({})
   const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false)
   const [batchMenuOpen, setBatchMenuOpen] = useState(false)
+  const [isBatchDownloading, setIsBatchDownloading] = useState(false)
   const pageSize = 50
 
   // Fetch upload history
@@ -110,6 +112,7 @@ function MyUploadsPage() {
 
   // Download mutations
   const showSaveDialogMutation = trpc.provider.showSaveDialog.useMutation()
+  const showOpenDirectoryMutation = trpc.provider.showOpenDirectory.useMutation()
   const downloadToFileMutation = trpc.provider.downloadToFile.useMutation()
 
   const trpcUtils = trpc.useUtils()
@@ -165,14 +168,17 @@ function MyUploadsPage() {
     }
   }, [selectedCount])
 
-  const handleToggleSelection = (item: {
-    id: string
-    providerId: string
-    bucket: string
-    key: string
-    type: 'file' | 'folder'
-    name: string
-  }, checked: boolean) => {
+  const handleToggleSelection = (
+    item: {
+      id: string
+      providerId: string
+      bucket: string
+      key: string
+      type: 'file' | 'folder'
+      name: string
+    },
+    checked: boolean
+  ) => {
     setSelectedItems((prev) => {
       if (!checked) {
         const { [item.id]: _, ...rest } = prev
@@ -207,7 +213,7 @@ function MyUploadsPage() {
           providerId: item.providerId,
           bucket: item.bucket,
           key: item.key,
-          type: item.type,
+          type: item.type as 'file' | 'folder',
           name: item.name
         }
       }
@@ -215,7 +221,7 @@ function MyUploadsPage() {
     })
   }
 
-  const handleClearSelection = () => {
+  const handleCancelSelection = () => {
     setSelectedItems({})
   }
 
@@ -238,7 +244,10 @@ function MyUploadsPage() {
     }
 
     try {
-      const providerCache = new Map<string, Awaited<ReturnType<typeof trpcUtils.provider.getById.fetch>> | null>()
+      const providerCache = new Map<
+        string,
+        Awaited<ReturnType<typeof trpcUtils.provider.getById.fetch>> | null
+      >()
 
       for (const group of groups.values()) {
         if (!providerCache.has(group.providerId)) {
@@ -280,6 +289,12 @@ function MyUploadsPage() {
         variant: 'destructive'
       })
     }
+  }
+
+  const buildSavePath = (directory: string, fileName: string) => {
+    const separator = window.api.platform.isWindows ? '\\' : '/'
+    const trimmed = directory.replace(/[\\/]+$/, '')
+    return `${trimmed}${separator}${fileName}`
   }
 
   const handleDownload = async (
@@ -364,6 +379,104 @@ function MyUploadsPage() {
         variant: 'destructive'
       })
       return ''
+    }
+  }
+
+  const handleBatchDownload = async () => {
+    if (selectedCount === 0 || isBatchDownloading) return
+    console.log('selectedCount', selectedCount)
+    console.log('isBatchDownloading', isBatchDownloading)
+
+    const downloadItems = Object.values(selectedItems).filter((item) => item.type === 'file')
+    if (downloadItems.length === 0) {
+      toast({
+        title: 'Download unavailable',
+        description: 'Only files can be downloaded.'
+      })
+      return
+    }
+
+    try {
+      setIsBatchDownloading(true)
+      const dialogResult = await showOpenDirectoryMutation.mutateAsync({
+        title: 'Select download folder'
+      })
+      if (dialogResult.canceled || !dialogResult.folderPath) {
+        if (dialogResult.canceled) {
+          return
+        }
+        toast({
+          title: 'Download failed',
+          description: 'Could not open the folder picker.',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      const providerCache = new Map<
+        string,
+        Awaited<ReturnType<typeof trpcUtils.provider.getById.fetch>> | null
+      >()
+      let successCount = 0
+      let errorCount = 0
+
+      const queue = [...downloadItems]
+      const concurrency = 3
+      const workers = Array.from({ length: Math.min(concurrency, queue.length) }).map(async () => {
+        while (queue.length > 0) {
+          const item = queue.shift()
+          if (!item) return
+          try {
+            if (!providerCache.has(item.providerId)) {
+              const provider = await trpcUtils.provider.getById.fetch({ id: item.providerId })
+              providerCache.set(item.providerId, provider ?? null)
+            }
+            const provider = providerCache.get(item.providerId)
+            if (!provider) {
+              errorCount += 1
+              continue
+            }
+            const savePath = buildSavePath(dialogResult.folderPath, item.name)
+            const result = await downloadToFileMutation.mutateAsync({
+              provider,
+              bucket: item.bucket,
+              key: item.key,
+              savePath
+            })
+            if (result.success) {
+              successCount += 1
+            } else {
+              errorCount += 1
+            }
+          } catch {
+            errorCount += 1
+          }
+        }
+      })
+
+      await Promise.all(workers)
+
+      if (successCount > 0) {
+        toast({
+          title: 'Download complete',
+          description: `${successCount} file${successCount > 1 ? 's' : ''} saved to ${dialogResult.folderPath}`
+        })
+      }
+      if (errorCount > 0) {
+        toast({
+          title: 'Download failed',
+          description: `${errorCount} file${errorCount > 1 ? 's' : ''} failed to download`,
+          variant: 'destructive'
+        })
+      }
+    } catch (error) {
+      toast({
+        title: 'Download failed',
+        description: error instanceof Error ? error.message : 'Unable to download files.',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsBatchDownloading(false)
     }
   }
 
@@ -550,7 +663,10 @@ function MyUploadsPage() {
                   {data.data.map((item) => (
                     <UploadHistoryRow
                       key={item.id}
-                      item={item}
+                      item={{
+                        ...item,
+                        type: item.type as 'file' | 'folder'
+                      }}
                       isSelected={!!selectedItems[item.id]}
                       onRowClick={handleRowClick}
                       onToggleSelection={handleToggleSelection}
@@ -604,6 +720,21 @@ function MyUploadsPage() {
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in slide-in-from-bottom-4">
           <div className="flex items-center gap-3 rounded-full border border-border bg-background px-4 py-2 shadow-lg">
             <span className="text-sm font-medium">{selectedCount} items selected</span>
+            <Separator orientation="vertical" className="h-5" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBatchDownload}
+              disabled={
+                isBatchDownloading ||
+                selectedCount === 0 ||
+                Object.values(selectedItems).every((item) => item.type !== 'file')
+              }
+              className="h-8"
+            >
+              <IconDownload size={16} className="mr-1" />
+              Download
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -613,16 +744,8 @@ function MyUploadsPage() {
               <IconTrash size={16} className="mr-1" />
               Delete
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleClearSelection} className="h-8">
-              Clear selection
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setBatchMenuOpen(false)}
-              className="h-8"
-            >
-              Close
+            <Button variant="ghost" size="sm" onClick={handleCancelSelection} className="h-8">
+              Cancel
             </Button>
           </div>
         </div>
