@@ -1,5 +1,5 @@
 appId: com.ding.app
-productName: ding
+productName: DING
 directories:
   buildResources: build
 files:
@@ -16,8 +16,9 @@ extraResources:
 asarUnpack:
   - resources/**
 win:
-  executableName: ding
-  signAndEditExecutable: false
+  executableName: DING
+  icon: build/icon.ico
+  signAndEditExecutable: true
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   oneClick: false

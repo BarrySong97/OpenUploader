@@ -104,9 +104,19 @@ export class S3Adapter implements StorageAdapter {
       await this.client.send(new ListBucketsCommand({}))
       return { connected: true }
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      console.error('[S3Adapter] Connection test failed:', {
+        provider: {
+          type: this.provider.type,
+          region: this.provider.region,
+          endpoint: getS3Endpoint(this.provider),
+          accountId: 'accountId' in this.provider ? this.provider.accountId : undefined
+        },
+        error: message
+      })
       return {
         connected: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: message
       }
     }
   }

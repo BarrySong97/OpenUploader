@@ -16,14 +16,15 @@ extraResources:
 asarUnpack:
   - resources/**
 win:
-  executableName: ding
-  signAndEditExecutable: false
+  executableName: dingtest
+  icon: build/icon.ico
+  signAndEditExecutable: true
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: ${name}-test-${version}-setup.${ext}
   oneClick: false
   allowToChangeInstallationDirectory: true
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
+  shortcutName: ${productName}-test
+  uninstallDisplayName: ${productName}-test
   createDesktopShortcut: always
 
 mac:

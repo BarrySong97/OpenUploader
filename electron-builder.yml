@@ -17,7 +17,8 @@ asarUnpack:
   - resources/**
 win:
   executableName: ding
-  signAndEditExecutable: false
+  icon: build/icon.ico
+  signAndEditExecutable: true
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   oneClick: false

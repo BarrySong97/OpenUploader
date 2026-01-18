@@ -11,15 +11,16 @@ export type Database = ReturnType<typeof drizzle<typeof schema>>
 let db: Database | null = null
 
 export function getDatabasePath(): string {
-  const appName = app.getName().toLowerCase()
-  const appEnv = is.dev ? 'dev' : appName.includes('test') ? 'test' : 'prod'
+  const appEnv = (
+    import.meta.env.VITE_APP_ENV ||
+    (is.dev ? 'dev' : 'prod')
+  ).toLowerCase()
   const dbName = `pglite-db-${appEnv}`
   return path.join(app.getPath('userData'), dbName)
 }
 
 export async function initDatabase(): Promise<Database> {
   const dbPath = getDatabasePath()
-  console.log('PGlite database path:', dbPath)
   const client = new PGlite(dbPath)
 
   db = drizzle({ client, schema })

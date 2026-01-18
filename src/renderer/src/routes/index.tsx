@@ -243,7 +243,7 @@ function Index() {
   // Limit providers shown on dashboard
   const displayedProviders = providers.slice(0, MAX_DASHBOARD_PROVIDERS)
   const hasMoreProviders = providers.length > MAX_DASHBOARD_PROVIDERS
-
+  console.log(displayedProviders)
   // Has providers - show list
   return (
     <PageLayout>
