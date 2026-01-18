@@ -31,6 +31,14 @@ export default defineConfig({
         '@shared': resolve('src/shared')
       }
     },
-    plugins: [TanStackRouter(), react(), tailwindcss()]
+    plugins: [
+      TanStackRouter({
+        target: "react",
+        routesDirectory: './src/routes',
+        generatedRouteTree: './src/routeTree.gen.ts'
+      }),
+      react(),
+      tailwindcss()
+    ]
   }
 })

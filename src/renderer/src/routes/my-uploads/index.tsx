@@ -50,7 +50,7 @@ import { getFileIcon } from '@/lib/file-utils'
 import { PageLayout } from '@/components/layout/page-layout'
 import { StatCard } from '@/components/dashboard/status-card'
 
-export const Route = createFileRoute('/my-uploads')({
+export const Route = createFileRoute('/my-uploads/')({
   component: MyUploadsPage
 })
 
@@ -459,13 +459,13 @@ function MyUploadsPage() {
       if (successCount > 0) {
         toast({
           title: 'Download complete',
-          description: `${successCount} file${successCount > 1 ? 's' : ''} saved to ${dialogResult.folderPath}`
+          description: `${successCount} file${successCount > 1 ? `s` : ``} saved to ${dialogResult.folderPath}`
         })
       }
       if (errorCount > 0) {
         toast({
           title: 'Download failed',
-          description: `${errorCount} file${errorCount > 1 ? 's' : ''} failed to download`,
+          description: `${errorCount} file${errorCount > 1 ? `s` : ``} failed to download`,
           variant: 'destructive'
         })
       }

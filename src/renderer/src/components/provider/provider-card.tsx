@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ProviderSettingsDialog } from './provider-settings-dialog'
 import { ProviderBrandIcon, getProviderIconKey } from './brand-icon'
+import { useBucketStore } from '@renderer/stores/bucket-store'
 
 interface ProviderCardProps {
   provider: TRPCProvider
@@ -66,6 +67,7 @@ export function ProviderCard({ provider }: ProviderCardProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const { isLoading, isConnected, stats } = useProviderStatus(provider)
+  const { recentBuckets, setPendingOpenBucket } = useBucketStore()
   const utils = trpc.useUtils()
 
   const deleteMutation = trpc.provider.delete.useMutation({
@@ -89,10 +91,21 @@ export function ProviderCard({ provider }: ProviderCardProps) {
   }
 
   const iconKey = getProviderIconKey(provider)
+  const lastVisitedBucket = recentBuckets.find((bucket) => bucket.providerId === provider.id)
 
   return (
     <>
-      <Link to="/provider/$providerId" params={{ providerId: provider.id }} className="block group">
+      <Link
+        to="/providers/$providerId"
+        params={{ providerId: provider.id }}
+        className="block group"
+        onClick={() => {
+          const bucketName = provider.bucket ?? lastVisitedBucket?.bucketName
+          if (bucketName) {
+            setPendingOpenBucket(provider.id, bucketName)
+          }
+        }}
+      >
         <div className="relative rounded-md border border-border bg-white dark:bg-[#1E1E1E] p-4 transition-colors hover:bg-accent/30">
           {/* Header */}
           <div className="flex items-center justify-between">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
   IconRefresh,
   IconCloud,
@@ -19,7 +19,6 @@ import {
   BucketTableSkeleton,
   type BucketInfo
 } from '@renderer/components/provider/bucket-table'
-import { BucketBrowser } from '@renderer/components/provider/bucket-browser'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
@@ -27,9 +26,10 @@ import { CreateBucketDialog } from '@renderer/components/provider/create-bucket-
 import { DeleteBucketDialog } from '@renderer/components/provider/delete-bucket-dialog'
 import { ProviderSettingsDialog } from '@renderer/components/provider/provider-settings-dialog'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
+import { useBucketStore } from '@renderer/stores/bucket-store'
 import { PageLayout } from '@/components/layout/page-layout'
 
-export const Route = createFileRoute('/provider/$providerId')({
+export const Route = createFileRoute('/providers/$providerId/')({
   component: ProviderDetail
 })
 
@@ -165,30 +165,46 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [bucketToDelete, setBucketToDelete] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const navigate = useNavigate()
 
   // Navigation store
-  const { currentBucket, setProvider, setBucket, reset } = useNavigationStore()
+  const { setProvider, } = useNavigationStore()
+
+  // Bucket store for recent buckets
+  const { addRecentBucket, } = useBucketStore()
 
   // Set provider info when component mounts or provider changes
   useEffect(() => {
-    const variant = provider.type === 's3-compatible' ? provider.variant : undefined
     setProvider({
       id: provider.id,
-      name: provider.name,
-      variant
+      name: provider.name
     })
-
-    // Reset navigation state when leaving the page
-    return () => {
-      reset()
-    }
-  }, [provider.id, provider.name, provider.type, setProvider, reset])
+  }, [
+    provider.id,
+    provider.name,
+    provider.type,
+    setProvider,
+  ])
 
   const endpoint = getProviderEndpoint(provider)
   const region = provider.type === 's3-compatible' ? provider.region : null
 
   const handleBucketClick = (bucket: BucketInfo) => {
-    setBucket(bucket.name)
+    navigate({
+      to: '/providers/$providerId/$bucketName',
+      params: {
+        providerId: provider.id,
+        bucketName: bucket.name
+      }
+    })
+
+    // Record bucket in recent buckets
+    addRecentBucket({
+      providerId: provider.id,
+      providerName: provider.name,
+      providerType: provider.type,
+      bucketName: bucket.name
+    })
   }
 
   const handleCopyEndpoint = async () => {
@@ -202,11 +218,6 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
   const handleBucketDelete = (bucket: BucketInfo) => {
     setBucketToDelete(bucket.name)
     setDeleteBucketOpen(true)
-  }
-
-  // Show bucket browser when a bucket is selected
-  if (currentBucket) {
-    return <BucketBrowser provider={provider} bucket={currentBucket} />
   }
 
   return (
@@ -378,6 +389,6 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
       />
-    </PageLayout>
+    </PageLayout >
   )
 }

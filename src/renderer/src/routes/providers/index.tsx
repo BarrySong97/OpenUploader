@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { PageLayout } from '@/components/layout/page-layout'
 
-export const Route = createFileRoute('/providers')({
+export const Route = createFileRoute('/providers/')({
   component: ProvidersPage
 })
 
@@ -85,7 +85,7 @@ function ProviderRow({ provider }: ProviderRowProps) {
       <TableRow className="group">
         <TableCell>
           <Link
-            to="/provider/$providerId"
+            to="/providers/$providerId"
             params={{ providerId: provider.id }}
             className="flex items-center gap-3"
           >

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
   IconCloud,
   IconFolder,
@@ -36,6 +36,7 @@ import { formatFileSize } from '@/lib/utils'
 import { getFileIcon } from '@/lib/file-utils'
 import { toast } from '@/hooks/use-toast'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
+import { useBucketStore } from '@renderer/stores/bucket-store'
 
 export const Route = createFileRoute('/')({
   component: Index
@@ -243,7 +244,6 @@ function Index() {
   // Limit providers shown on dashboard
   const displayedProviders = providers.slice(0, MAX_DASHBOARD_PROVIDERS)
   const hasMoreProviders = providers.length > MAX_DASHBOARD_PROVIDERS
-  console.log(displayedProviders)
   // Has providers - show list
   return (
     <PageLayout>
@@ -339,7 +339,10 @@ function Index() {
                 {recentUploads.data.map((item) => (
                   <RecentUploadRow
                     key={item.id}
-                    item={item}
+                    item={{
+                      ...item,
+                      type: item.type === 'folder' ? 'folder' : 'file'
+                    }}
                     onRowClick={handleRowClick}
                     onDownload={handleDownload}
                     onCopyUrl={getCopyUrl}
@@ -463,11 +466,7 @@ function RecentUploadRow({ item, onRowClick, onDownload, onCopyUrl }: RecentUplo
               className="h-7 w-7 text-muted-foreground hover:text-foreground"
               onClick={handleCopy}
             >
-              {copied ? (
-                <IconCheck size={16} className="text-green-500" />
-              ) : (
-                <IconCopy size={16} />
-              )}
+              {copied ? <IconCheck size={16} className="text-green-500" /> : <IconCopy size={16} />}
             </Button>
           </div>
         )}

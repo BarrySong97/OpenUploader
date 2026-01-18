@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import type { TRPCProvider } from '@renderer/lib/trpc'
 import { trpc } from '@renderer/lib/trpc'
+import { useBucketStore } from '@renderer/stores/bucket-store'
 
 export interface ProviderStats {
   buckets: { name: string; creationDate?: string }[]
@@ -14,6 +16,8 @@ export interface ProviderStatus {
 }
 
 export function useProviderStatus(provider: TRPCProvider) {
+  const { setProviderBuckets } = useBucketStore()
+
   const connectionQuery = trpc.provider.testConnection.useQuery(provider, {
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000 // 5 minutes
@@ -24,6 +28,15 @@ export function useProviderStatus(provider: TRPCProvider) {
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000 // 5 minutes
   })
+
+  useEffect(() => {
+    if (statsQuery.data?.buckets?.length) {
+      setProviderBuckets(
+        provider.id,
+        statsQuery.data.buckets.map((bucket) => bucket.name)
+      )
+    }
+  }, [provider.id, statsQuery.data?.buckets, setProviderBuckets])
 
   // Use isFetching to detect refresh loading state (isLoading is only for initial load)
   const isLoading =

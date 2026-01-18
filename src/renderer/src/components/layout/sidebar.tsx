@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
-import { IconPlus } from '@tabler/icons-react'
+import { IconPlus, IconFolder, IconChevronDown } from '@tabler/icons-react'
 import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { trpc } from '@renderer/lib/trpc'
@@ -15,6 +15,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarSeparator,
   useSidebar
 } from '@/components/ui/sidebar'
@@ -23,14 +26,18 @@ import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
 import { MENU_ITEMS } from '@renderer/constants/menu'
 import { ProviderBrandIcon, getProviderIconKey } from '@/components/provider/brand-icon'
 import { StreamlinePlumpModule } from './icon'
-import { useLocalStorageState } from 'ahooks'
+import { useBucketStore } from '@renderer/stores/bucket-store'
+import { useNavigationStore } from '@renderer/stores/navigation-store'
 
 // Active indicator component - green color, positioned at sidebar edge
-function ActiveIndicator() {
+function ActiveIndicator({ className }: { className?: string }) {
   return (
     <motion.div
       layoutId="sidebar-indicator"
-      className="absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full bg-[#20a64b]"
+      className={cn(
+        'absolute -left-2 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-[#20a64b]',
+        className
+      )}
       transition={{ type: 'spring', stiffness: 500, damping: 30 }}
     />
   )
@@ -39,7 +46,7 @@ function ActiveIndicator() {
 // Custom menu button styles
 const menuButtonStyles = cn(
   // Reset shadcn default active/hover styles
-  'data-active:bg-white data-active:dark:bg-[#2a2a2a] data-active:shadow-sm data-active:text-foreground rounded-md',
+  'data-active:bg-white data-active:dark:bg-[#2a2a2a] data-active:shadow-sm data-active:text-foreground rounded-md group',
   'hover:bg-white/90 ',
   'active:bg-white/90 '
 )
@@ -85,9 +92,16 @@ const MAX_RECENT_PROVIDERS = 5
 
 export function AppSidebar() {
   const [addProviderOpen, setAddProviderOpen] = useState(false)
+  const [openProviders, setOpenProviders] = useState<Record<string, boolean>>({})
   const { data: providers, isLoading } = trpc.provider.list.useQuery()
   const router = useRouterState()
   const currentPath = router.location.pathname
+
+  // Bucket store for recent buckets
+  const { recentBuckets } = useBucketStore()
+
+  // Navigation store
+  const { setProvider } = useNavigationStore()
 
   const isProviderActive = (providerId: string) => {
     return currentPath.includes(`/provider/${providerId}`)
@@ -103,9 +117,6 @@ export function AppSidebar() {
 
   // Get recent providers (limit to MAX_RECENT_PROVIDERS)
   const recentProviders = providers?.slice(0, MAX_RECENT_PROVIDERS) ?? []
-  const [sidebarOpen, setSidebarOpen] = useLocalStorageState('sidebar-open', {
-    defaultValue: true
-  })
   return (
     <>
       <Sidebar collapsible="icon" className="!border-none">
@@ -187,21 +198,112 @@ export function AppSidebar() {
                 recentProviders.map((provider) => {
                   const iconKey = getProviderIconKey(provider)
                   const isActive = provider.id === activeProviderId
+                  const showProviderIndicator = isActive
+
+                  // Get recent buckets for this provider
+                  const providerBuckets = recentBuckets
+                    .filter((b) => b.providerId === provider.id)
+                    .slice(0, 3) // Show max 3 buckets per provider
+                  const canToggleBuckets = providerBuckets.length > 0
+                  const isOpen = openProviders[provider.id] ?? isActive
 
                   return (
                     <SidebarMenuItem key={provider.id} className="relative">
-                      {isActive && <ActiveIndicator />}
-                      <SidebarMenuButton
-                        asChild
-                        tooltip={provider.name}
-                        isActive={isActive}
-                        className={menuButtonStyles}
+                      {showProviderIndicator && (
+                        <ActiveIndicator
+                          className={cn(
+                            providerBuckets.length > 0 &&
+                            isOpen &&
+                            'h-full top-1 bottom-2 translate-y-0'
+                          )}
+                        />
+                      )}
+
+                      <div
+                        className={cn(
+                          'rounded-md transition-colors',
+                          isOpen && 'bg-white/70 dark:bg-[#2a2a2a] shadow-sm'
+                        )}
                       >
-                        <Link to="/provider/$providerId" params={{ providerId: provider.id }}>
-                          <ProviderBrandIcon iconKey={iconKey} size={20} showBackground={false} />
-                          <span>{provider.name}</span>
-                        </Link>
-                      </SidebarMenuButton>
+                        <div className="flex items-center">
+                          <SidebarMenuButton
+                            asChild
+                            tooltip={provider.name}
+                            isActive={isActive}
+                            className={cn(
+                              menuButtonStyles,
+                              canToggleBuckets && 'data-active:shadow-none'
+                            )}
+                          >
+                            <Link to="/providers/$providerId" params={{ providerId: provider.id }}>
+                              <ProviderBrandIcon
+                                iconKey={iconKey}
+                                size={20}
+                                showBackground={false}
+                              />
+                              <span className="flex-1 truncate">{provider.name}</span>
+                              {canToggleBuckets && (
+                                <button
+                                  type="button"
+                                  aria-label={
+                                    isOpen ? 'Collapse provider buckets' : 'Expand provider buckets'
+                                  }
+                                  className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition group-hover:text-foreground hover:bg-white/70 dark:hover:bg-[#2a2a2a]"
+                                  onClick={(event) => {
+                                    event.preventDefault()
+                                    event.stopPropagation()
+                                    setOpenProviders((prev) => ({
+                                      ...prev,
+                                      [provider.id]: !(prev[provider.id] ?? isActive)
+                                    }))
+                                  }}
+                                >
+                                  <IconChevronDown
+                                    size={16}
+                                    className={cn('transition-transform', isOpen && 'rotate-180')}
+                                  />
+                                </button>
+                              )}
+                            </Link>
+                          </SidebarMenuButton>
+                        </div>
+
+                        {/* Recent Buckets Submenu */}
+                        {providerBuckets.length > 0 && isOpen && (
+                          <SidebarMenuSub className="bg-white/70 dark:bg-[#2a2a2a] rounded-md py-1">
+                            {providerBuckets.map((bucket) => {
+                              return (
+                                <SidebarMenuSubItem
+                                  key={`${bucket.providerId}-${bucket.bucketName}`}
+                                  className="relative"
+                                >
+                                  <SidebarMenuSubButton
+                                    asChild
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      setProvider({
+                                        id: provider.id,
+                                        name: provider.name
+                                      })
+                                    }}
+                                  >
+                                    <Link
+                                      to="/providers/$providerId/$bucketName"
+                                      params={{
+                                        providerId: provider.id,
+                                        bucketName: bucket.bucketName
+                                      }}
+                                    >
+                                      <IconFolder size={16} />
+                                      <span>{bucket.bucketName}</span>
+                                    </Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              )
+                            })}
+                          </SidebarMenuSub>
+                        )}
+                      </div>
                     </SidebarMenuItem>
                   )
                 })
