@@ -10,4 +10,3 @@ src/renderer/src/routeTree.gen.ts
 
 # Release
 release.sh
-release-*.sh
