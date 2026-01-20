@@ -35,7 +35,7 @@ function ActiveIndicator({ className }: { className?: string }) {
     <motion.div
       layoutId="sidebar-indicator"
       className={cn(
-        'absolute -left-2 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-[#20a64b]',
+        'absolute -left-2 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-sidebar-active-indicator',
         className
       )}
       transition={{ type: 'spring', stiffness: 500, damping: 30 }}
@@ -79,7 +79,7 @@ function AppBrand() {
         >
           <Link to={MENU_ITEMS.dashboard.path}>
             <StreamlinePlumpModule />
-            <span className="font-bold">DING</span>
+            <span className="font-bold">Open Uploader</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -213,8 +213,8 @@ export function AppSidebar() {
                         <ActiveIndicator
                           className={cn(
                             providerBuckets.length > 0 &&
-                            isOpen &&
-                            'h-full top-1 bottom-2 translate-y-0'
+                              isOpen &&
+                              'h-full top-1 bottom-2 translate-y-0'
                           )}
                         />
                       )}
@@ -272,15 +272,13 @@ export function AppSidebar() {
                         {providerBuckets.length > 0 && isOpen && (
                           <SidebarMenuSub className="bg-white/70 dark:bg-[#2a2a2a] rounded-md py-1">
                             {providerBuckets.map((bucket) => {
-                              const isActive = currentPath.includes(`/providers/${provider.id}/${bucket.bucketName}`)
+                              const isActive = currentPath.includes(
+                                `/providers/${provider.id}/${bucket.bucketName}`
+                              )
                               return (
                                 <SidebarMenuSubItem
                                   key={`${bucket.providerId}-${bucket.bucketName}`}
-
-                                  className={cn(
-                                    'relative',
-                                    isActive && 'bg-accent rounded-md'
-                                  )}
+                                  className={cn('relative', isActive && 'bg-accent rounded-md')}
                                 >
                                   <SidebarMenuSubButton
                                     asChild

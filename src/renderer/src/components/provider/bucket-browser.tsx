@@ -542,30 +542,22 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
           <span>Showing {files.length} items</span>
           {(hasPrevPage || hasNextPage) && (
             <div className="flex items-center gap-4">
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handlePrevPage}
                 disabled={!hasPrevPage || isFetching}
-                className={cn(
-                  'text-sm transition-colors',
-                  hasPrevPage && !isFetching
-                    ? 'text-foreground hover:text-primary'
-                    : 'cursor-not-allowed text-muted-foreground/50'
-                )}
               >
                 Previous
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleNextPage}
                 disabled={!hasNextPage || isFetching}
-                className={cn(
-                  'text-sm transition-colors',
-                  hasNextPage && !isFetching
-                    ? 'text-foreground hover:text-primary'
-                    : 'cursor-not-allowed text-muted-foreground/50'
-                )}
               >
                 Next
-              </button>
+              </Button>
             </div>
           )}
         </div>

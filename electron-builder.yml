@@ -1,5 +1,5 @@
-appId: com.ding.app
-productName: ding
+appId: com.openuploader.app
+productName: Open Uploader
 directories:
   buildResources: build
 files:
@@ -16,7 +16,7 @@ extraResources:
 asarUnpack:
   - resources/**
 win:
-  executableName: ding
+  executableName: OpenUploader
   icon: build/icon.ico
   signAndEditExecutable: true
 nsis:
