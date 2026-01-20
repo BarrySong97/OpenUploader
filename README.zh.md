@@ -1,5 +1,7 @@
 # Open Uploader
 
+中文 | [English](./README.md) | [下载](https://github.com/BarrySong97/OpenUploader/releases)
+
 一个跨平台桌面应用程序，用于管理和上传文件到多个云存储服务商。
 
 ![Preview 3](./docs/images/preview3.png)
@@ -59,8 +61,6 @@
 ![Preview 6](./docs/images/preview6.png)
 ![Preview 4](./docs/images/preview4.png)
 ![Preview 5](./docs/images/preview5.png)
-
-
 
 ## 开源协议
 

@@ -21,16 +21,71 @@ Generate a complete bash script that automates the release process with the foll
    - `./dist/open-uploader-$NEW_VERSION-setup.exe`
    - `./dist/open-uploader-$NEW_VERSION-setup.exe.blockmap`
    - `./dist/latest.yml` (CRITICAL for auto-update)
-8. Create GitHub Release:
+8. Generate Release Notes from git commits:
+
+   ```bash
+   # Get previous tag (the tag before HEAD)
+   PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+
+   echo "📝 Generating release notes from $PREV_TAG to v$NEW_VERSION..."
+
+   # Get all commit messages between previous tag and new version
+   COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"%s" --no-merges)
+
+   # Initialize release notes
+   RELEASE_NOTES=""
+
+   # Extract and format FEATURES
+   FEATURES=$(echo "$COMMITS" | grep "^feat" || true)
+   if [ -n "$FEATURES" ]; then
+     RELEASE_NOTES+="## ✨ Features\n\n"
+     while IFS= read -r line; do
+       # Remove "feat" prefix and scope, keep the description
+       MSG=$(echo "$line" | sed -E 's/^feat(\([^)]+\))?: */- /')
+       RELEASE_NOTES+="$MSG\n"
+     done <<< "$FEATURES"
+     RELEASE_NOTES+="\n"
+   fi
+
+   # Extract and format BUG FIXES
+   FIXES=$(echo "$COMMITS" | grep "^fix" || true)
+   if [ -n "$FIXES" ]; then
+     RELEASE_NOTES+="## 🐛 Bug Fixes\n\n"
+     while IFS= read -r line; do
+       MSG=$(echo "$line" | sed -E 's/^fix(\([^)]+\))?: */- /')
+       RELEASE_NOTES+="$MSG\n"
+     done <<< "$FIXES"
+     RELEASE_NOTES+="\n"
+   fi
+
+   # Extract OTHER changes (chore, refactor, docs, etc.)
+   OTHERS=$(echo "$COMMITS" | grep -vE "^(feat|fix)" || true)
+   if [ -n "$OTHERS" ]; then
+     RELEASE_NOTES+="## 🔧 Other Changes\n\n"
+     while IFS= read -r line; do
+       # Keep the type prefix for other changes
+       MSG=$(echo "$line" | sed -E 's/^/- /')
+       RELEASE_NOTES+="$MSG\n"
+     done <<< "$OTHERS"
+   fi
+
+   # Preview release notes
+   echo "📋 Release Notes Preview:"
+   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+   echo -e "$RELEASE_NOTES"
+   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+   ```
+
+9. Create GitHub Release:
    ```bash
    gh release create "v$NEW_VERSION" \
      --title "Open Uploader v$NEW_VERSION" \
-     --generate-notes \
+     --notes "$(echo -e "$RELEASE_NOTES")" \
      ./dist/open-uploader-$NEW_VERSION-setup.exe \
      ./dist/open-uploader-$NEW_VERSION-setup.exe.blockmap \
      ./dist/latest.yml
    ```
-9. Show success message with release URL
+10. Show success message with release URL
 
 **Script Features**:
 

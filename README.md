@@ -1,5 +1,7 @@
 # Open Uploader
 
+[中文](./README.zh.md) | English | [Download](https://github.com/BarrySong97/OpenUploader/releases)
+
 A cross-platform desktop application for managing and uploading files to multiple cloud storage providers.
 
 ![Preview 3](./docs/images/preview3.png)

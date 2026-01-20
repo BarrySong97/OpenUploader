@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 
 interface UpdateInfo {
@@ -14,7 +14,7 @@ interface ProgressInfo {
 }
 
 export function GlobalAutoUpdateChecker() {
-  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
+  const updateInfoRef = useRef<UpdateInfo | null>(null)
 
   // 只在生产环境下启用自动更新
   const isProduction = import.meta.env.VITE_APP_ENV === 'prod'
@@ -33,7 +33,7 @@ export function GlobalAutoUpdateChecker() {
 
     const unsubAvailable = window.api.updater.onUpdateAvailable((info) => {
       console.log('Update available:', info)
-      setUpdateInfo(info)
+      updateInfoRef.current = info
 
       // 显示更新可用通知
       toast.info(`New version ${info.version} available`, {
@@ -68,7 +68,7 @@ export function GlobalAutoUpdateChecker() {
       if (progressInfo.percent < 100) {
         toast.loading(`Downloading update: ${Math.round(progressInfo.percent)}%`, {
           id: 'update-download-progress',
-          description: `Version ${updateInfo?.version || 'latest'}`
+          description: `Version ${updateInfoRef.current?.version || 'latest'}`
         })
       }
     })
@@ -118,7 +118,7 @@ export function GlobalAutoUpdateChecker() {
       unsubDownloaded()
       unsubError()
     }
-  }, [updateInfo, isProduction])
+  }, [isProduction])
 
   // 这个组件不渲染任何 UI，只负责监听更新事件并显示 toast
   return null
