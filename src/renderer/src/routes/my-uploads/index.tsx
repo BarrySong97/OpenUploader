@@ -23,8 +23,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { UploadHistoryTableSkeleton } from '@/components/ui/table-skeleton'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import {
   AlertDialog,
@@ -49,6 +47,7 @@ import { cn, formatFileSize } from '@/lib/utils'
 import { getFileIcon } from '@/lib/file-utils'
 import { PageLayout } from '@/components/layout/page-layout'
 import { StatCard } from '@/components/dashboard/status-card'
+import { MyUploadsPageSkeleton } from '@/components/ui/page-skeletons'
 
 export const Route = createFileRoute('/my-uploads/')({
   component: MyUploadsPage
@@ -548,19 +547,7 @@ function MyUploadsPage() {
 
   // Loading state
   if (isLoading) {
-    return (
-      <PageLayout>
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Skeleton className="h-24 rounded-md" />
-          <Skeleton className="h-24 rounded-md" />
-          <Skeleton className="h-24 rounded-md" />
-        </div>
-        <div>
-          <Skeleton className="mb-4 h-7 w-40" />
-          <UploadHistoryTableSkeleton />
-        </div>
-      </PageLayout>
-    )
+    return <MyUploadsPageSkeleton />
   }
   console.log(isFetching)
   return (

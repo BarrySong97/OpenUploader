@@ -21,9 +21,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
-import { Skeleton } from '@/components/ui/skeleton'
 import { PresetDialog } from '@/components/preset-dialog'
 import type { Preset, CreatePresetInput } from '@shared/schema/settings'
+import { SettingsPageSkeleton } from '@/components/ui/page-skeletons'
 
 export const Route = createFileRoute('/settings/presets')({
   component: PresetManagement
@@ -97,18 +97,7 @@ function PresetManagement() {
   }
 
   if (isLoading) {
-    return (
-      <div>
-        <div className="mb-6">
-          <Skeleton className="h-8 w-64 mb-2" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-32" />
-          <Skeleton className="h-64 rounded-md" />
-        </div>
-      </div>
-    )
+    return <SettingsPageSkeleton showButton />
   }
 
   return (

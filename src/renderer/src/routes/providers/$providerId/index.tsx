@@ -19,7 +19,6 @@ import {
   BucketTableSkeleton,
   type BucketInfo
 } from '@renderer/components/provider/bucket-table'
-import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { CreateBucketDialog } from '@renderer/components/provider/create-bucket-dialog'
@@ -28,6 +27,7 @@ import { ProviderSettingsDialog } from '@renderer/components/provider/provider-s
 import { useNavigationStore } from '@renderer/stores/navigation-store'
 import { useBucketStore } from '@renderer/stores/bucket-store'
 import { PageLayout } from '@/components/layout/page-layout'
+import { ProviderDetailSkeleton } from '@/components/ui/page-skeletons'
 
 export const Route = createFileRoute('/providers/$providerId/')({
   component: ProviderDetail
@@ -55,49 +55,6 @@ function ProviderDetail() {
   }
 
   return <ProviderDetailContent provider={provider} />
-}
-
-function ProviderDetailSkeleton() {
-  return (
-    <PageLayout className="space-y-8">
-      {/* Provider Info Card Skeleton */}
-      <div className="rounded-md border bg-card p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-5">
-            <Skeleton className="h-20 w-20 rounded-2xl" />
-            <div>
-              <Skeleton className="h-8 w-48" />
-              <div className="mt-3 flex gap-2">
-                <Skeleton className="h-6 w-24" />
-                <Skeleton className="h-6 w-20" />
-                <Skeleton className="h-6 w-24" />
-              </div>
-            </div>
-          </div>
-          <Skeleton className="h-9 w-9" />
-        </div>
-        <div className="mt-6 border-t pt-6">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="mt-2 h-10 w-full" />
-        </div>
-      </div>
-
-      {/* Bucket List Skeleton */}
-      <section>
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-7 w-24" />
-            <Skeleton className="h-5 w-8 rounded-full" />
-          </div>
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-9 w-24" />
-            <Skeleton className="h-9 w-32" />
-          </div>
-        </div>
-        <BucketTableSkeleton />
-      </section>
-    </PageLayout>
-  )
 }
 
 // Helper functions for provider display

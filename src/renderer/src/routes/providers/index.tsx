@@ -10,7 +10,6 @@ import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
 import { ProviderSettingsDialog } from '@/components/provider/provider-settings-dialog'
 import { ProviderBrandIcon, getProviderIconKey } from '@/components/provider/brand-icon'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -30,6 +29,7 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
 import { PageLayout } from '@/components/layout/page-layout'
+import { ProvidersListSkeleton } from '@/components/ui/page-skeletons'
 
 export const Route = createFileRoute('/providers/')({
   component: ProvidersPage
@@ -180,54 +180,7 @@ function ProvidersPage() {
 
   // Loading state
   if (isLoading) {
-    return (
-      <PageLayout>
-        <div className="mb-4 flex items-center justify-between">
-          <Skeleton className="h-7 w-32" />
-          <Skeleton className="h-9 w-32" />
-        </div>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Provider</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Buckets</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[1, 2, 3].map((i) => (
-                <TableRow key={i}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-10 w-10 rounded-md" />
-                      <div>
-                        <Skeleton className="h-4 w-24 mb-1" />
-                        <Skeleton className="h-3 w-16" />
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-20" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-8" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-20" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-8 w-16" />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </PageLayout>
-    )
+    return <ProvidersListSkeleton />
   }
 
   return (

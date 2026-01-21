@@ -28,7 +28,12 @@ function SettingsIndex() {
     setChecking(true)
     try {
       const result = await window.api.updater.checkForUpdates()
-
+      console.log(result)
+      toast({
+        title: 'Update Check Failed',
+        description: JSON.stringify(result),
+        variant: 'destructive'
+      })
       if (result.error) {
         // 检查失败
         toast({
@@ -78,19 +83,18 @@ function SettingsIndex() {
               <span>{version}</span>
             </div>
           </div>
-          {isProduction && (
-            <div className="mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCheckForUpdates}
-                disabled={checking}
-              >
-                <IconRefresh className={cn('mr-2 h-4 w-4', checking && 'animate-spin')} />
-                {checking ? 'Checking...' : 'Check for Updates'}
-              </Button>
-            </div>
-          )}
+
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCheckForUpdates}
+              disabled={checking}
+            >
+              <IconRefresh className={cn('mr-2 h-4 w-4', checking && 'animate-spin')} />
+              {checking ? 'Checking...' : 'Check for Updates'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

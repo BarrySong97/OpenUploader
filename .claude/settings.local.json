@@ -30,7 +30,8 @@
       "Bash(pnpm tsc:*)",
       "Bash(pnpm drizzle-kit generate)",
       "Bash(pnpm build:unpack:*)",
-      "Bash(pnpm build:*)"
+      "Bash(pnpm build:*)",
+      "Bash(pnpm run build)"
     ]
   }
 }

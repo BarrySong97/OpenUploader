@@ -29,7 +29,6 @@ import {
   TableRow
 } from '@/components/ui/table'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
-import { Skeleton } from '@/components/ui/skeleton'
 import { StatCard } from '@/components/dashboard/status-card'
 import { PageLayout } from '@/components/layout/page-layout'
 import { formatFileSize } from '@/lib/utils'
@@ -37,6 +36,7 @@ import { getFileIcon } from '@/lib/file-utils'
 import { toast } from '@/hooks/use-toast'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { useBucketStore } from '@renderer/stores/bucket-store'
+import { DashboardSkeleton } from '@/components/ui/page-skeletons'
 
 export const Route = createFileRoute('/')({
   component: Index
@@ -209,22 +209,7 @@ function Index() {
 
   // Loading state
   if (isLoading) {
-    return (
-      <PageLayout>
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Skeleton className="h-24 rounded-md" />
-          <Skeleton className="h-24 rounded-md" />
-          <Skeleton className="h-24 rounded-md" />
-        </div>
-        <div>
-          <Skeleton className="mb-4 h-7 w-40" />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Skeleton className="h-32 rounded-md" />
-            <Skeleton className="h-32 rounded-md" />
-          </div>
-        </div>
-      </PageLayout>
-    )
+    return <DashboardSkeleton />
   }
 
   // Empty state - show onboarding

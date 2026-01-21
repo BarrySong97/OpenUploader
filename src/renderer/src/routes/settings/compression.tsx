@@ -13,10 +13,10 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
-import { Skeleton } from '@/components/ui/skeleton'
 import { PresetDialog } from '@/components/preset-dialog'
 import { ImageCropper } from '@/components/ui/image-cropper'
 import type { AspectRatioOption } from '@/components/ui/image-cropper'
+import { SettingsPageSkeleton } from '@/components/ui/page-skeletons'
 
 export const Route = createFileRoute('/settings/compression')({
   component: CompressionSettings
@@ -180,17 +180,7 @@ function CompressionSettings() {
   const isTestingCompression = selectFileMutation.isPending || compressFileMutation.isPending
 
   if (isLoading) {
-    return (
-      <div>
-        <div className="mb-6">
-          <Skeleton className="h-8 w-64 mb-2" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        <div className="space-y-6">
-          <Skeleton className="h-64 rounded-md" />
-        </div>
-      </div>
-    )
+    return <SettingsPageSkeleton />
   }
 
   return (
