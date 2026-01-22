@@ -55,6 +55,7 @@ interface UploadStore {
   clearAll: () => void
   setProcessing: (isProcessing: boolean) => void
   setDrawerOpen: (open: boolean) => void
+  setMaxConcurrent: (maxConcurrent: number) => void
 }
 
 function generateId(): string {
@@ -73,7 +74,7 @@ function isImageFile(file: File): boolean {
 export const useUploadStore = create<UploadStore>((set) => ({
   tasks: [],
   isProcessing: false,
-  maxConcurrent: 3,
+  maxConcurrent: 5,
   isDrawerOpen: false,
 
   addTasks: (newTasks) => {
@@ -150,6 +151,10 @@ export const useUploadStore = create<UploadStore>((set) => ({
 
   setDrawerOpen: (open) => {
     set({ isDrawerOpen: open })
+  },
+
+  setMaxConcurrent: (maxConcurrent) => {
+    set({ maxConcurrent })
   }
 }))
 

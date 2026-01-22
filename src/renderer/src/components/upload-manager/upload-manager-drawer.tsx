@@ -19,6 +19,7 @@ export function UploadManagerDrawer() {
   const setDrawerOpen = useUploadStore((state) => state.setDrawerOpen)
   const removeTask = useUploadStore((state) => state.removeTask)
   const clearCompleted = useUploadStore((state) => state.clearCompleted)
+  const maxConcurrent = useUploadStore((state) => state.maxConcurrent)
 
   const { activeTasks, pendingTasks, completedTasks, errorTasks } = useMemo(() => {
     return {
@@ -59,7 +60,7 @@ export function UploadManagerDrawer() {
             {totalTaskCount === 0
               ? 'No uploads'
               : activeCount > 0
-                ? `${activeCount} active, ${completedTasks.length} completed${errorCount > 0 ? `, ${errorCount} failed` : ''}`
+                ? `${activeCount} active (${maxConcurrent} concurrent), ${completedTasks.length} completed${errorCount > 0 ? `, ${errorCount} failed` : ''}`
                 : `${completedTasks.length} completed${errorCount > 0 ? `, ${errorCount} failed` : ''}`}
           </SheetDescription>
         </SheetHeader>
