@@ -19,6 +19,7 @@ const api = {
   showInFolder: (filePath: string) => ipcRenderer.invoke('show-in-folder', filePath),
   getDatabasePath: () => ipcRenderer.invoke('get-database-path'),
   readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath),
+  notifyOpenFilesReady: () => ipcRenderer.send('open-files-ready'),
   onOpenFiles: (callback: (filePaths: string[]) => void) => {
     const handler = (_event: unknown, filePaths: string[]) => callback(filePaths)
     ipcRenderer.on('open-files', handler)

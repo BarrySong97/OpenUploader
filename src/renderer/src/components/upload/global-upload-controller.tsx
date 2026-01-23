@@ -85,6 +85,11 @@ export function GlobalUploadController() {
   }, [])
 
   useEffect(() => {
+    if (!window.api?.notifyOpenFilesReady || !window.api?.onOpenFiles || !window.api?.readFile) {
+      return
+    }
+
+    window.api.notifyOpenFilesReady()
     const unsubscribe = window.api.onOpenFiles(async (filePaths) => {
       const filesFromPaths = await Promise.all(
         filePaths.map(async (filePath) => {

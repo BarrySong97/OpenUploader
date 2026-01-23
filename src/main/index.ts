@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join, basename, extname } from 'path'
 import { pathToFileURL } from 'url'
 import { promises as fs } from 'fs'
-import { existsSync, statSync } from 'fs'
+import { appendFileSync, existsSync, mkdirSync, statSync } from 'fs'
 
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createIPCHandler } from 'trpc-electron/main'
@@ -16,6 +16,34 @@ import { initializeBuiltInPresets } from './services/preset-service'
 import packageInfo from '../../package.json'
 
 const pendingOpenFiles = new Set<string>()
+let isRendererReady = false
+const logDirectoryName = 'logs'
+const logFileName = 'main.log'
+
+function logMain(message: string, error?: unknown): void {
+  try {
+    const logDir = join(app.getPath('userData'), logDirectoryName)
+    mkdirSync(logDir, { recursive: true })
+    const logPath = join(logDir, logFileName)
+    const details = error instanceof Error ? `\n${error.stack || error.message}` : ''
+    const line = `[${new Date().toISOString()}] ${message}${details}\n`
+    appendFileSync(logPath, line)
+  } catch (logError) {
+    console.error('[MainLog] Failed to write log', logError)
+  }
+}
+
+process.on('uncaughtException', (error) => {
+  logMain('[Process] Uncaught exception', error)
+})
+
+process.on('unhandledRejection', (reason) => {
+  logMain('[Process] Unhandled rejection', reason)
+})
+
+app.on('render-process-gone', (_event, _webContents, details) => {
+  logMain(`[Process] Renderer gone: ${details.reason}`)
+})
 
 function getMimeTypeFromPath(filePath: string): string {
   const extension = extname(filePath).toLowerCase()
@@ -38,6 +66,11 @@ function getMimeTypeFromPath(filePath: string): string {
   }
 }
 
+function isAllowedOpenFile(filePath: string): boolean {
+  const extension = extname(filePath).toLowerCase()
+  return ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg'].includes(extension)
+}
+
 function normalizeOpenFiles(paths: string[]): string[] {
   const results: string[] = []
   const seen = new Set<string>()
@@ -45,6 +78,7 @@ function normalizeOpenFiles(paths: string[]): string[] {
   for (const rawPath of paths) {
     if (!rawPath || rawPath.startsWith('-')) continue
     if (!existsSync(rawPath)) continue
+    if (!isAllowedOpenFile(rawPath)) continue
     try {
       const stats = statSync(rawPath)
       if (!stats.isFile()) continue
@@ -61,6 +95,7 @@ function normalizeOpenFiles(paths: string[]): string[] {
 
 function getOpenFileArgs(args: string[]): string[] {
   if (!args || args.length === 0) return []
+  if (!app.isPackaged && !args.includes('--open-file')) return []
   return normalizeOpenFiles(args.slice(1))
 }
 
@@ -72,7 +107,7 @@ function sendOpenFiles(paths: string[]): void {
     return
   }
   const hasLoadingWindow = windows.some((window) => window.webContents.isLoading())
-  if (hasLoadingWindow) {
+  if (hasLoadingWindow || !isRendererReady) {
     paths.forEach((filePath) => pendingOpenFiles.add(filePath))
     return
   }
@@ -87,18 +122,21 @@ function handleOpenFiles(paths: string[]): void {
   sendOpenFiles(normalized)
 }
 
-const gotSingleInstanceLock = app.requestSingleInstanceLock()
-if (!gotSingleInstanceLock) {
-  app.quit()
-} else {
-  app.on('second-instance', (_event, commandLine) => {
-    handleOpenFiles(getOpenFileArgs(commandLine))
-    const window = BrowserWindow.getAllWindows()[0]
-    if (window) {
-      if (window.isMinimized()) window.restore()
-      window.focus()
-    }
-  })
+if (app.isPackaged) {
+  const gotSingleInstanceLock = app.requestSingleInstanceLock()
+  if (!gotSingleInstanceLock) {
+    logMain('[SingleInstance] Lock failed, quitting.')
+    app.quit()
+  } else {
+    app.on('second-instance', (_event, commandLine) => {
+      handleOpenFiles(getOpenFileArgs(commandLine))
+      const window = BrowserWindow.getAllWindows()[0]
+      if (window) {
+        if (window.isMinimized()) window.restore()
+        window.focus()
+      }
+    })
+  }
 }
 
 app.on('open-file', (event, filePath) => {
@@ -231,6 +269,15 @@ app.whenReady().then(async () => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
+  ipcMain.on('open-files-ready', () => {
+    isRendererReady = true
+    if (pendingOpenFiles.size > 0) {
+      const queued = Array.from(pendingOpenFiles)
+      pendingOpenFiles.clear()
+      sendOpenFiles(queued)
+    }
+  })
+
   // Show item in folder
   ipcMain.handle('show-in-folder', (_event, filePath: string) => {
     shell.showItemInFolder(filePath)
@@ -256,7 +303,7 @@ app.whenReady().then(async () => {
 
   const mainWindow = createWindow()
   mainWindow.webContents.on('did-finish-load', () => {
-    if (pendingOpenFiles.size > 0) {
+    if (pendingOpenFiles.size > 0 && isRendererReady) {
       const queued = Array.from(pendingOpenFiles)
       pendingOpenFiles.clear()
       sendOpenFiles(queued)
