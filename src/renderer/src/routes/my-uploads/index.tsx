@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { format } from 'date-fns'
 import { cn, formatFileSize } from '@/lib/utils'
-import { PageLayout } from '@/components/layout/page-layout'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { StatCard } from '@/components/dashboard/status-card'
 import { MyUploadsPageSkeleton } from '@/components/ui/page-skeletons'
 import { UploadHistoryTable } from '@/components/upload-history/upload-history-table'
@@ -80,9 +80,11 @@ function MyUploadsPage() {
   const { data, isLoading, isFetching, refetch } = trpc.uploadHistory.list.useQuery({
     query: debouncedSearch || undefined,
     page,
+
     pageSize,
     sortBy: 'uploadedAt',
     sortDirection: 'desc'
+
   })
 
   // Fetch statistics
@@ -510,33 +512,32 @@ function MyUploadsPage() {
   }
   console.log(isFetching)
   return (
-    <PageLayout>
-      {/* Stats Grid */}
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard
-          title="Total Files"
-          value={stats?.totalFiles.toLocaleString() ?? '0'}
-          icon={<IconFile size={20} />}
-        />
-        <StatCard
-          title="Total Size"
-          value={formatFileSize(stats?.totalSize ?? 0)}
-          icon={<IconDatabase size={20} />}
-        />
-        <StatCard
-          title="Recent Upload"
-          value={
-            stats?.recentUploads[0]
-              ? format(new Date(stats.recentUploads[0].uploadedAt), 'MMM dd')
-              : 'N/A'
-          }
-          icon={<IconClock size={20} />}
-        />
-      </div>
+    <div className="flex min-h-0 h-[calc(100vh-48px)] flex-col bg-white">
+      <div className="p-6 pb-4">
+        {/* Stats Grid */}
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard
+            title="Total Files"
+            value={stats?.totalFiles.toLocaleString() ?? '0'}
+            icon={<IconFile size={20} />}
+          />
+          <StatCard
+            title="Total Size"
+            value={formatFileSize(stats?.totalSize ?? 0)}
+            icon={<IconDatabase size={20} />}
+          />
+          <StatCard
+            title="Recent Upload"
+            value={
+              stats?.recentUploads[0]
+                ? format(new Date(stats.recentUploads[0].uploadedAt), 'MMM dd')
+                : 'N/A'
+            }
+            icon={<IconClock size={20} />}
+          />
+        </div>
 
-      {/* Upload History Section */}
-      <div>
-        <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-semibold">Upload History</h2>
             <Badge variant="secondary" className="rounded-full">
@@ -564,9 +565,11 @@ function MyUploadsPage() {
             </Button>
           </div>
         </div>
+      </div>
 
-        {data && data.data.length > 0 ? (
-          <>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="px-6 pb-6">
+          {data && data.data.length > 0 ? (
             <UploadHistoryTable
               data={data.data.map((item) => ({
                 ...item,
@@ -582,42 +585,43 @@ function MyUploadsPage() {
               onDelete={setDeleteTarget}
               isDeleting={deleteObjectMutation.isPending}
             />
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-md border py-16">
+              <IconUpload size={48} className="mb-4 text-muted-foreground" />
+              <p className="text-lg font-medium">No uploads yet</p>
+              <p className="text-sm text-muted-foreground">
+                Files uploaded through this app will appear here
+              </p>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
 
-            {/* Pagination */}
-            {data.totalPages > 1 && (
-              <div className="mt-6 flex items-center justify-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {page} of {data.totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-                  disabled={page === data.totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center rounded-md border py-16">
-            <IconUpload size={48} className="mb-4 text-muted-foreground" />
-            <p className="text-lg font-medium">No uploads yet</p>
-            <p className="text-sm text-muted-foreground">
-              Files uploaded through this app will appear here
-            </p>
-          </div>
-        )}
-      </div>
+      {data && (
+        <div className="flex items-center justify-between border-t border-border px-6 py-3 text-sm text-muted-foreground">
+          <span>Showing {data.data.length} items</span>
+          {data.totalPages > 1 && (
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1 || isFetching}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                disabled={page === data.totalPages || isFetching}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
       {selectedCount > 0 && batchMenuOpen && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in slide-in-from-bottom-4">
           <div className="flex items-center gap-3 rounded-full border border-border bg-background px-4 py-2 shadow-lg">
@@ -700,6 +704,6 @@ function MyUploadsPage() {
         provider={selectedFileDetail?.provider ?? ({} as TRPCProvider)}
         bucket={selectedFileDetail?.bucket ?? ''}
       />
-    </PageLayout>
+    </div>
   )
 }
