@@ -31,6 +31,12 @@ declare global {
       showInFolder: (filePath: string) => Promise<void>
       getDatabasePath: () => Promise<string>
       readFile: (filePath: string) => Promise<{ name: string; mimeType: string; data: Uint8Array }>
+      createMarkdownTempDir: () => Promise<string>
+      downloadRemoteFile: (
+        url: string,
+        tempDir: string
+      ) => Promise<{ name: string; mimeType: string; path: string }>
+      removeMarkdownTempDir: (tempDir: string) => Promise<void>
       notifyOpenFilesReady: () => void
       onOpenFiles: (callback: (filePaths: string[]) => void) => () => void
       updater: {

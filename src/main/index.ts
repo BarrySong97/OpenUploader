@@ -1,8 +1,11 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join, basename, extname } from 'path'
 import { pathToFileURL } from 'url'
-import { promises as fs } from 'fs'
+import { promises as fs, createWriteStream } from 'fs'
 import { appendFileSync, existsSync, mkdirSync, statSync } from 'fs'
+import { pipeline } from 'stream/promises'
+import { Readable } from 'stream'
+import { ReadableStream } from 'stream/web'
 
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createIPCHandler } from 'trpc-electron/main'
@@ -64,6 +67,45 @@ function getMimeTypeFromPath(filePath: string): string {
     default:
       return 'application/octet-stream'
   }
+}
+
+function getExtensionFromContentType(contentType: string): string | null {
+  const normalized = contentType.split(';')[0].trim().toLowerCase()
+  switch (normalized) {
+    case 'image/jpeg':
+      return '.jpg'
+    case 'image/png':
+      return '.png'
+    case 'image/webp':
+      return '.webp'
+    case 'image/gif':
+      return '.gif'
+    case 'image/svg+xml':
+      return '.svg'
+    case 'image/bmp':
+      return '.bmp'
+    default:
+      return null
+  }
+}
+
+function resolveDownloadName(url: URL, contentType: string): string {
+  const baseName = basename(url.pathname)
+  const extension = getExtensionFromContentType(contentType)
+
+  if (baseName) {
+    if (extname(baseName)) return baseName
+    return extension ? `${baseName}${extension}` : baseName
+  }
+
+  const fallback = `download-${Date.now()}`
+  return extension ? `${fallback}${extension}` : fallback
+}
+
+function isSubPath(parent: string, child: string): boolean {
+  const parentPath = parent.replace(/\\/g, '/').replace(/\/+$/, '')
+  const childPath = child.replace(/\\/g, '/')
+  return childPath.startsWith(`${parentPath}/`)
 }
 
 function isAllowedOpenFile(filePath: string): boolean {
@@ -298,6 +340,57 @@ app.whenReady().then(async () => {
       name: basename(filePath),
       mimeType: getMimeTypeFromPath(filePath),
       data: buffer
+    }
+  })
+
+  ipcMain.handle('create-markdown-temp-dir', async () => {
+    const baseDir = join(app.getPath('temp'), 'open-uploader', 'markdown-images')
+    await fs.mkdir(baseDir, { recursive: true })
+    const tempDir = await fs.mkdtemp(join(baseDir, 'batch-'))
+    return tempDir
+  })
+
+  ipcMain.handle('remove-markdown-temp-dir', async (_event, tempDir: string) => {
+    const baseDir = join(app.getPath('temp'), 'open-uploader', 'markdown-images')
+    if (!isSubPath(baseDir, tempDir)) {
+      throw new Error('Invalid temp directory')
+    }
+    await fs.rm(tempDir, { recursive: true, force: true })
+  })
+
+  ipcMain.handle('download-remote-file', async (_event, url: string, tempDir: string) => {
+    const parsed = new URL(url)
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('Unsupported URL protocol')
+    }
+
+    const baseDir = join(app.getPath('temp'), 'open-uploader', 'markdown-images')
+    if (!isSubPath(baseDir, tempDir)) {
+      throw new Error('Invalid temp directory')
+    }
+
+    await fs.mkdir(tempDir, { recursive: true })
+
+    const response = await fetch(parsed.toString())
+    if (!response.ok) {
+      throw new Error(`Failed to download: ${response.status}`)
+    }
+
+    const contentType = response.headers.get('content-type') ?? ''
+    const name = resolveDownloadName(parsed, contentType)
+    const mimeType = contentType ? contentType.split(';')[0].trim() : getMimeTypeFromPath(name)
+    const targetPath = join(tempDir, name)
+    const body = response.body
+    if (!body) {
+      throw new Error('Empty response body')
+    }
+    const readable = Readable.fromWeb(body as unknown as ReadableStream)
+    await pipeline(readable, createWriteStream(targetPath))
+
+    return {
+      name,
+      mimeType,
+      path: targetPath
     }
   })
 

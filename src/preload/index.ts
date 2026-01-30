@@ -19,6 +19,11 @@ const api = {
   showInFolder: (filePath: string) => ipcRenderer.invoke('show-in-folder', filePath),
   getDatabasePath: () => ipcRenderer.invoke('get-database-path'),
   readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath),
+  createMarkdownTempDir: () => ipcRenderer.invoke('create-markdown-temp-dir'),
+  downloadRemoteFile: (url: string, tempDir: string) =>
+    ipcRenderer.invoke('download-remote-file', url, tempDir),
+  removeMarkdownTempDir: (tempDir: string) =>
+    ipcRenderer.invoke('remove-markdown-temp-dir', tempDir),
   notifyOpenFilesReady: () => ipcRenderer.send('open-files-ready'),
   onOpenFiles: (callback: (filePaths: string[]) => void) => {
     const handler = (_event: unknown, filePaths: string[]) => callback(filePaths)

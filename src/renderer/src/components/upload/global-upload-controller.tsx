@@ -1,8 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { IconCloudUpload } from '@tabler/icons-react'
+import { IconCloudUpload, IconFileText, IconLoader2 } from '@tabler/icons-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import { UploadFilesDrawer } from '@/components/provider/upload-files-drawer'
 import { useGlobalUploadStore } from '@renderer/stores/global-upload-store'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
+import { extractMarkdownImagesFromFiles, isMarkdownFile } from '@/lib/markdown-image'
 import { trpc } from '@renderer/lib/trpc'
 import { cn } from '@/lib/utils'
 
@@ -15,8 +34,41 @@ function buildPrefix(path: string[]) {
   return `${path.join('/')}/`
 }
 
+type UploadCallbacks = {
+  onUploadStart?: () => void
+  onUploadComplete?: () => void
+}
+
+type PendingDrop = {
+  files: File[]
+  callbacks?: UploadCallbacks
+}
+
+type ParsingStatus = {
+  stage: string
+  current: number
+  total: number
+}
+
+function mergeFiles(primary: File[], extra: File[]): File[] {
+  const results: File[] = []
+  const seen = new Set<string>()
+  for (const file of [...primary, ...extra]) {
+    const key = `${file.name}:${file.size}:${file.lastModified}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    results.push(file)
+  }
+  return results
+}
+
 export function GlobalUploadController() {
   const [isDragging, setIsDragging] = useState(false)
+  const [markdownPromptOpen, setMarkdownPromptOpen] = useState(false)
+  const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null)
+  const [isParsingMarkdown, setIsParsingMarkdown] = useState(false)
+  const [parsingDialogOpen, setParsingDialogOpen] = useState(false)
+  const [parsingStatus, setParsingStatus] = useState<ParsingStatus | null>(null)
   const dragCounter = useRef(0)
   const trpcUtils = trpc.useUtils()
 
@@ -30,6 +82,104 @@ export function GlobalUploadController() {
     { id: currentProvider?.id ?? '' },
     { enabled: Boolean(currentProvider?.id) && Boolean(currentBucket) }
   )
+
+  const markdownCount = useMemo(() => {
+    if (!pendingDrop) return 0
+    return pendingDrop.files.filter(isMarkdownFile).length
+  }, [pendingDrop])
+
+  const handleDroppedFiles = (droppedFiles: File[], callbacks?: UploadCallbacks) => {
+    if (droppedFiles.some(isMarkdownFile)) {
+      setPendingDrop({ files: droppedFiles, callbacks })
+      setMarkdownPromptOpen(true)
+      return
+    }
+
+    openWithFiles(droppedFiles, callbacks)
+  }
+
+  const handleSkipMarkdown = () => {
+    if (!pendingDrop) {
+      setMarkdownPromptOpen(false)
+      return
+    }
+
+    openWithFiles(pendingDrop.files, pendingDrop.callbacks)
+    setPendingDrop(null)
+    setMarkdownPromptOpen(false)
+  }
+
+  const handleParseMarkdown = async () => {
+    if (!pendingDrop) return
+    setIsParsingMarkdown(true)
+    setMarkdownPromptOpen(false)
+    setParsingDialogOpen(true)
+    setParsingStatus({ stage: 'Scanning markdown files', current: 0, total: 0 })
+    let tempDir: string | null = null
+    let cleanupAfterUpload = false
+
+    try {
+      tempDir = await window.api.createMarkdownTempDir()
+      const extractedFiles = await extractMarkdownImagesFromFiles(pendingDrop.files, {
+        tempDir,
+        onStage: (stage) => {
+          if (stage === 'scan') {
+            setParsingStatus((prev) => ({
+              stage: 'Scanning markdown files',
+              current: prev?.current ?? 0,
+              total: prev?.total ?? 0
+            }))
+          } else {
+            setParsingStatus((prev) => ({
+              stage: 'Loading referenced images',
+              current: prev?.current ?? 0,
+              total: prev?.total ?? 0
+            }))
+          }
+        },
+        onProgress: (current, total) => {
+          setParsingStatus((prev) => ({
+            stage: prev?.stage ?? 'Loading referenced images',
+            current,
+            total
+          }))
+        }
+      })
+
+      const nonMarkdownFiles = pendingDrop.files.filter((file) => !isMarkdownFile(file))
+      const combinedFiles = mergeFiles(nonMarkdownFiles, extractedFiles)
+      const existingOnComplete = pendingDrop.callbacks?.onUploadComplete
+      cleanupAfterUpload = true
+      openWithFiles(combinedFiles, {
+        ...pendingDrop.callbacks,
+        onUploadComplete: async () => {
+          if (tempDir) {
+            try {
+              await window.api.removeMarkdownTempDir(tempDir)
+            } catch (error) {
+              console.error('[MarkdownUpload] Failed to cleanup temp dir:', error)
+            }
+          }
+          existingOnComplete?.()
+        }
+      })
+    } catch (error) {
+      console.error('[MarkdownUpload] Failed to extract images:', error)
+      openWithFiles(pendingDrop.files, pendingDrop.callbacks)
+    } finally {
+      if (tempDir && !cleanupAfterUpload) {
+        try {
+          await window.api.removeMarkdownTempDir(tempDir)
+        } catch (error) {
+          console.error('[MarkdownUpload] Failed to cleanup temp dir:', error)
+        }
+      }
+      setIsParsingMarkdown(false)
+      setParsingDialogOpen(false)
+      setParsingStatus(null)
+      setPendingDrop(null)
+    }
+  }
 
   useEffect(() => {
     const handleDragEnter = (event: DragEvent) => {
@@ -64,7 +214,7 @@ export function GlobalUploadController() {
       setIsDragging(false)
       const droppedFiles = Array.from(event.dataTransfer?.files ?? [])
       if (droppedFiles.length === 0) return
-      openWithFiles(droppedFiles, {
+      handleDroppedFiles(droppedFiles, {
         onUploadComplete: () => {
           trpcUtils.provider.listObjects.invalidate()
           trpcUtils.uploadHistory.list.invalidate()
@@ -129,7 +279,7 @@ export function GlobalUploadController() {
     const droppedFiles = Array.from(event.dataTransfer.files)
     if (droppedFiles.length === 0) return
 
-    openWithFiles(droppedFiles, {
+    handleDroppedFiles(droppedFiles, {
       onUploadComplete: () => {
         trpcUtils.provider.listObjects.invalidate()
         trpcUtils.uploadHistory.list.invalidate()
@@ -175,6 +325,65 @@ export function GlobalUploadController() {
           onUploadComplete?.()
         }}
       />
+
+      <AlertDialog
+        open={markdownPromptOpen}
+        onOpenChange={(open) => {
+          if (!open && !isParsingMarkdown) {
+            handleSkipMarkdown()
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogMedia>
+              <IconFileText className="text-foreground" />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Parse images from Markdown?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Detected {markdownCount} markdown file{markdownCount !== 1 && 's'}. Extract
+                referenced images and add them to this upload?
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Markdown files will be skipped; referenced images will be added.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isParsingMarkdown}>Skip</AlertDialogCancel>
+            <AlertDialogAction onClick={handleParseMarkdown} disabled={isParsingMarkdown}>
+              {isParsingMarkdown ? (
+                <>
+                  <IconLoader2 size={16} className="mr-2 animate-spin" />
+                  Parsing...
+                </>
+              ) : (
+                'Parse images'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={parsingDialogOpen} onOpenChange={() => undefined}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconLoader2 size={18} className="animate-spin" />
+              Parsing markdown
+            </DialogTitle>
+            <DialogDescription className="space-y-1">
+              <div>{parsingStatus?.stage ?? 'Preparing to parse files...'}</div>
+              {parsingStatus && parsingStatus.total > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  {parsingStatus.current}/{parsingStatus.total}
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
