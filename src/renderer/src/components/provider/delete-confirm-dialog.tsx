@@ -83,7 +83,7 @@ export function DeleteConfirmDialog({
           <AlertDialogDescription className="space-y-2">
             <p>
               Are you sure you want to delete{' '}
-              <span className="font-medium text-foreground">{file.name}</span>?
+              <span className="font-medium text-foreground break-all">{file.name}</span>?
             </p>
             {isFolder && (
               <p className="text-destructive">

@@ -24,6 +24,11 @@ const api = {
     ipcRenderer.invoke('download-remote-file', url, tempDir),
   removeMarkdownTempDir: (tempDir: string) =>
     ipcRenderer.invoke('remove-markdown-temp-dir', tempDir),
+  saveFile: (options: {
+    defaultName: string
+    content: string
+    filters?: { name: string; extensions: string[] }[]
+  }) => ipcRenderer.invoke('save-file', options),
   notifyOpenFilesReady: () => ipcRenderer.send('open-files-ready'),
   onOpenFiles: (callback: (filePaths: string[]) => void) => {
     const handler = (_event: unknown, filePaths: string[]) => callback(filePaths)

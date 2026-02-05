@@ -40,8 +40,11 @@ import {
 import { ImageCropper } from '@/components/ui/image-cropper'
 import { FolderPickerDialog } from '@/components/provider/folder-picker-dialog'
 import { useUploadStore } from '@renderer/stores/upload-store'
+import { useGlobalUploadStore } from '@renderer/stores/global-upload-store'
 import { cn, formatFileSize } from '@/lib/utils'
 import { useUploadSettingsStore } from '@renderer/stores/upload-settings-store'
+import { useToast } from '@/components/ui/use-toast'
+import { replaceMarkdownImageSources } from '@/lib/markdown-image'
 
 interface UploadFilesDrawerProps {
   open: boolean
@@ -128,6 +131,10 @@ export function UploadFilesDrawer({
   const [fileItems, setFileItems] = useState<UploadFileItem[]>([])
   const [keepOriginal, setKeepOriginal] = useState(false)
   const [generateBlurHash, setGenerateBlurHash] = useState(false)
+  const [autoGenerateMarkdown, setAutoGenerateMarkdown] = useState(false)
+  const [markdownUrlMode, setMarkdownUrlMode] = useState<'with-endpoint' | 'without-endpoint'>(
+    'with-endpoint'
+  )
   const [isUploading, setIsUploading] = useState(false)
   const [cropperOpen, setCropperOpen] = useState(false)
   const [currentCropIndex, setCurrentCropIndex] = useState<number | null>(null)
@@ -804,11 +811,18 @@ export function UploadFilesDrawer({
     }
   }
 
-  const processUploads = async (target: {
-    provider: TRPCProvider
-    bucket: string
-    prefix?: string
-  }) => {
+  const processUploads = async (
+    target: {
+      provider: TRPCProvider
+      bucket: string
+      prefix?: string
+    },
+    options?: {
+      autoGenerateMarkdown?: boolean
+      markdownUrlMode?: 'with-endpoint' | 'without-endpoint'
+      markdownData?: typeof markdownData
+    }
+  ) => {
     // Update store with the selected concurrency level
     setMaxConcurrent(maxConcurrent)
 
@@ -834,12 +848,23 @@ export function UploadFilesDrawer({
     trpcUtils.provider.listObjects.invalidate()
     trpcUtils.uploadHistory.list.invalidate()
 
+    // Auto generate markdown if enabled
+    if (options?.autoGenerateMarkdown && options.markdownData) {
+      const withEndpoint = options.markdownUrlMode === 'with-endpoint'
+      await generateMarkdown(withEndpoint, options.markdownData)
+    }
+
     // Call onUploadComplete after all uploads are done
     onUploadComplete?.()
   }
   const handleStartUpload = () => {
     const target = resolveUploadTarget()
     if (!target || fileItems.length === 0) return
+
+    // Capture current state before closing drawer (markdownData will be cleared when drawer closes)
+    const shouldAutoGenerateMarkdown = autoGenerateMarkdown && hasMarkdownData
+    const currentMarkdownUrlMode = markdownUrlMode
+    const capturedMarkdownData = [...markdownData] // Clone to preserve data
 
     // Close drawer immediately
     onOpenChange(false)
@@ -849,10 +874,145 @@ export function UploadFilesDrawer({
     setUploadDrawerOpen(true)
 
     // Run uploads in background (non-blocking)
-    processUploads(target)
+    processUploads(target, {
+      autoGenerateMarkdown: shouldAutoGenerateMarkdown,
+      markdownUrlMode: currentMarkdownUrlMode,
+      markdownData: capturedMarkdownData
+    })
+  }
+
+  const { toast } = useToast()
+  const markdownData = useGlobalUploadStore((state) => state.markdownData)
+
+  const generateMarkdown = async (
+    withEndpoint: boolean,
+    markdownDataOverride?: typeof markdownData
+  ) => {
+    const dataToUse = markdownDataOverride ?? markdownData
+    if (dataToUse.length === 0) {
+      toast({
+        title: 'No markdown data',
+        description: 'No markdown files were uploaded.',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    try {
+      const markdownOutputs: string[] = []
+
+      // Build a lookup from file name to output key from completed upload tasks
+      // Exclude blurhash tasks - we want the preset-compressed or original uploads
+      const uploadStore = useUploadStore.getState()
+      const fileNameToTask = new Map<string, (typeof uploadStore.tasks)[0]>()
+      for (const task of uploadStore.tasks) {
+        if (
+          task.status === 'completed' &&
+          task.outputKey &&
+          task.compressionPreset !== 'blurhash' // Exclude blurhash tasks
+        ) {
+          fileNameToTask.set(task.file.name, task)
+        }
+      }
+
+      console.log('[GenerateMarkdown] markdownData:', dataToUse.length, 'files')
+      console.log('[GenerateMarkdown] completed tasks (excluding blurhash):', fileNameToTask.size)
+
+      for (const md of dataToUse) {
+        const replacements = new Map<string, string>()
+
+        console.log('[GenerateMarkdown] Processing:', md.fileName)
+        console.log(
+          '[GenerateMarkdown] imageSourceToFileName entries:',
+          md.imageSourceToFileName.size
+        )
+
+        // Iterate through the imageSourceToFileName mapping
+        for (const [originalSource, fileName] of md.imageSourceToFileName.entries()) {
+          console.log('[GenerateMarkdown] Looking for:', fileName, 'from source:', originalSource)
+          const task = fileNameToTask.get(fileName)
+          if (!task || !task.outputKey) {
+            console.log('[GenerateMarkdown] No matching task for:', fileName)
+            // Skip if no matching completed task
+            continue
+          }
+
+          console.log('[GenerateMarkdown] Found task with outputKey:', task.outputKey)
+
+          if (withEndpoint) {
+            // Get full URL with endpoint
+            try {
+              // Find the provider object from the providers list
+              const provider = providers?.find((p) => p.id === task.providerId)
+              if (provider) {
+                const result = await trpcUtils.provider.getPlainObjectUrl.fetch({
+                  provider,
+                  bucket: task.bucket,
+                  key: task.outputKey
+                })
+                replacements.set(originalSource, result.url)
+              } else {
+                // Fallback to key-only path
+                replacements.set(originalSource, `/${task.outputKey}`)
+              }
+            } catch {
+              // Fallback to key-only path
+              replacements.set(originalSource, `/${task.outputKey}`)
+            }
+          } else {
+            // Use key-only path with leading slash
+            replacements.set(originalSource, `/${task.outputKey}`)
+          }
+        }
+
+        // Replace image sources in markdown content
+        console.log('[GenerateMarkdown] Replacements:', replacements.size)
+        const updatedContent = replaceMarkdownImageSources(md.content, replacements)
+        markdownOutputs.push(updatedContent)
+      }
+
+      // Combine all markdown outputs
+      const combinedMarkdown = markdownOutputs.join('\n\n---\n\n')
+
+      // Generate default file name
+      const defaultName =
+        dataToUse.length === 1 ? dataToUse[0].fileName : `combined_${dataToUse.length}_files.md`
+
+      // Show save dialog
+      const result = await window.api.saveFile({
+        defaultName,
+        content: combinedMarkdown,
+        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }]
+      })
+
+      if (result.canceled) {
+        return
+      }
+
+      if (result.success) {
+        toast({
+          title: 'Markdown saved',
+          description: `Saved to ${result.filePath}`
+        })
+      } else {
+        toast({
+          title: 'Failed to save markdown',
+          description: 'Unknown error',
+          variant: 'destructive'
+        })
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      toast({
+        title: 'Failed to generate markdown',
+        description: errorMsg,
+        variant: 'destructive'
+      })
+    }
   }
 
   const canUpload = fileItems.length > 0 && !isUploading && Boolean(targetProvider && targetBucket)
+  const hasMarkdownData = markdownData.length > 0
 
   const handleDrawerDragOver = (event: React.DragEvent) => {
     if (!event.dataTransfer.types.includes('Files')) return
@@ -1067,7 +1227,9 @@ export function UploadFilesDrawer({
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="font-medium">{item.file.name}</TableCell>
+                            <TableCell className="font-medium break-all">
+                              {item.file.name}
+                            </TableCell>
                             <TableCell className="text-muted-foreground">
                               {formatFileSize(item.file.size)}
                             </TableCell>
@@ -1170,6 +1332,43 @@ export function UploadFilesDrawer({
                     disabled={isUploading || imageCount === 0}
                   />
                 </div>
+                {hasMarkdownData && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <Label
+                        htmlFor="auto-generate-markdown"
+                        className="text-sm font-normal cursor-pointer"
+                      >
+                        Generate Markdown
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Replace image URLs after upload completes
+                      </p>
+                      {autoGenerateMarkdown && (
+                        <Select
+                          value={markdownUrlMode}
+                          onValueChange={(v) =>
+                            setMarkdownUrlMode(v as 'with-endpoint' | 'without-endpoint')
+                          }
+                        >
+                          <SelectTrigger className="h-7 w-40 mt-2 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="with-endpoint">With Endpoint</SelectItem>
+                            <SelectItem value="without-endpoint">Without Endpoint</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                    <Switch
+                      id="auto-generate-markdown"
+                      checked={autoGenerateMarkdown}
+                      onCheckedChange={setAutoGenerateMarkdown}
+                      disabled={isUploading}
+                    />
+                  </div>
+                )}
                 <div className="space-y-2 border-t pt-3">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="max-concurrent" className="text-sm font-normal">

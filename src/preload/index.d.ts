@@ -37,6 +37,11 @@ declare global {
         tempDir: string
       ) => Promise<{ name: string; mimeType: string; path: string }>
       removeMarkdownTempDir: (tempDir: string) => Promise<void>
+      saveFile: (options: {
+        defaultName: string
+        content: string
+        filters?: { name: string; extensions: string[] }[]
+      }) => Promise<{ success: boolean; canceled?: boolean; filePath?: string }>
       notifyOpenFilesReady: () => void
       onOpenFiles: (callback: (filePaths: string[]) => void) => () => void
       updater: {

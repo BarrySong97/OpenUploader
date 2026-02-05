@@ -21,7 +21,7 @@ import {
 import { UploadFilesDrawer } from '@/components/provider/upload-files-drawer'
 import { useGlobalUploadStore } from '@renderer/stores/global-upload-store'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
-import { extractMarkdownImagesFromFiles, isMarkdownFile } from '@/lib/markdown-image'
+import { extractMarkdownDataFromFiles, isMarkdownFile } from '@/lib/markdown-image'
 import { trpc } from '@renderer/lib/trpc'
 import { cn } from '@/lib/utils'
 
@@ -75,8 +75,15 @@ export function GlobalUploadController() {
   const { currentProvider, currentBucket, currentPath } = useNavigationStore()
   const contextPrefix = useMemo(() => buildPrefix(currentPath), [currentPath])
 
-  const { isOpen, files, onUploadStart, onUploadComplete, openWithFiles, setOpen } =
-    useGlobalUploadStore()
+  const {
+    isOpen,
+    files,
+    onUploadStart,
+    onUploadComplete,
+    openWithFiles,
+    setOpen,
+    setMarkdownData
+  } = useGlobalUploadStore()
 
   const { data: contextProvider } = trpc.provider.getById.useQuery(
     { id: currentProvider?.id ?? '' },
@@ -120,7 +127,7 @@ export function GlobalUploadController() {
 
     try {
       tempDir = await window.api.createMarkdownTempDir()
-      const extractedFiles = await extractMarkdownImagesFromFiles(pendingDrop.files, {
+      const result = await extractMarkdownDataFromFiles(pendingDrop.files, {
         tempDir,
         onStage: (stage) => {
           if (stage === 'scan') {
@@ -147,7 +154,7 @@ export function GlobalUploadController() {
       })
 
       const nonMarkdownFiles = pendingDrop.files.filter((file) => !isMarkdownFile(file))
-      const combinedFiles = mergeFiles(nonMarkdownFiles, extractedFiles)
+      const combinedFiles = mergeFiles(nonMarkdownFiles, result.files)
       const existingOnComplete = pendingDrop.callbacks?.onUploadComplete
       cleanupAfterUpload = true
       openWithFiles(combinedFiles, {
@@ -163,6 +170,8 @@ export function GlobalUploadController() {
           existingOnComplete?.()
         }
       })
+      // Set markdown data AFTER openWithFiles to avoid being reset
+      setMarkdownData(result.markdownData)
     } catch (error) {
       console.error('[MarkdownUpload] Failed to extract images:', error)
       openWithFiles(pendingDrop.files, pendingDrop.callbacks)

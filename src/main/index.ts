@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join, basename, extname } from 'path'
 import { pathToFileURL } from 'url'
 import { promises as fs, createWriteStream } from 'fs'
@@ -343,6 +343,29 @@ app.whenReady().then(async () => {
     }
   })
 
+  // Save file dialog
+  ipcMain.handle(
+    'save-file',
+    async (
+      _event,
+      options: {
+        defaultName: string
+        content: string
+        filters?: { name: string; extensions: string[] }[]
+      }
+    ) => {
+      const result = await dialog.showSaveDialog({
+        defaultPath: options.defaultName,
+        filters: options.filters || [{ name: 'All Files', extensions: ['*'] }]
+      })
+      if (result.canceled || !result.filePath) {
+        return { success: false, canceled: true }
+      }
+      await fs.writeFile(result.filePath, options.content, 'utf-8')
+      return { success: true, filePath: result.filePath }
+    }
+  )
+
   ipcMain.handle('create-markdown-temp-dir', async () => {
     const baseDir = join(app.getPath('temp'), 'open-uploader', 'markdown-images')
     await fs.mkdir(baseDir, { recursive: true })
@@ -371,8 +394,24 @@ app.whenReady().then(async () => {
 
     await fs.mkdir(tempDir, { recursive: true })
 
-    const response = await fetch(parsed.toString())
+    // Encode the pathname to handle spaces and special characters
+    const encodedPathname = parsed.pathname
+      .split('/')
+      .map((segment) => encodeURIComponent(decodeURIComponent(segment)))
+      .join('/')
+    const fetchUrl = `${parsed.protocol}//${parsed.host}${encodedPathname}${parsed.search}`
+
+    console.log('[download-remote-file] Original URL:', url)
+    console.log('[download-remote-file] Fetch URL:', fetchUrl)
+
+    const response = await fetch(fetchUrl)
     if (!response.ok) {
+      console.log(
+        '[download-remote-file] Failed to download:',
+        fetchUrl,
+        'Status:',
+        response.status
+      )
       throw new Error(`Failed to download: ${response.status}`)
     }
 

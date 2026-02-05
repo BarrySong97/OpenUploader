@@ -40,9 +40,19 @@ interface UploadHistoryItem {
 interface UploadHistoryTableProps {
   data: UploadHistoryItem[]
   selectable?: boolean
-  selectedItems?: Record<string, { providerId: string; bucket: string; key: string; type: 'file' | 'folder'; name: string }>
+  selectedItems?: Record<
+    string,
+    { providerId: string; bucket: string; key: string; type: 'file' | 'folder'; name: string }
+  >
   onToggleSelection?: (
-    item: { id: string; providerId: string; bucket: string; key: string; type: 'file' | 'folder'; name: string },
+    item: {
+      id: string
+      providerId: string
+      bucket: string
+      key: string
+      type: 'file' | 'folder'
+      name: string
+    },
     checked: boolean
   ) => void
   onToggleAll?: (checked: boolean) => void
@@ -171,7 +181,14 @@ interface UploadHistoryRowProps {
   isSelected: boolean
   onRowClick?: (item: UploadHistoryItem) => void
   onToggleSelection?: (
-    item: { id: string; providerId: string; bucket: string; key: string; type: 'file' | 'folder'; name: string },
+    item: {
+      id: string
+      providerId: string
+      bucket: string
+      key: string
+      type: 'file' | 'folder'
+      name: string
+    },
     checked: boolean
   ) => void
   onDownload?: (providerId: string, bucket: string, key: string, fileName: string) => void
@@ -241,10 +258,7 @@ function UploadHistoryRow({
   )
 
   return (
-    <TableRow
-      className="group cursor-pointer"
-      onClick={() => onRowClick?.(item)}
-    >
+    <TableRow className="group cursor-pointer" onClick={() => onRowClick?.(item)}>
       {selectable && onToggleSelection && (
         <TableCell onClick={(e) => e.stopPropagation()}>
           <Checkbox
@@ -269,8 +283,8 @@ function UploadHistoryRow({
       <TableCell className="max-w-64">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex-shrink-0">{fileIcon}</div>
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-medium truncate">{item.name}</span>
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <span className="font-medium break-all">{item.name}</span>
             {item.isCompressed && (
               <Badge variant="secondary" className="text-xs">
                 Compressed
@@ -283,9 +297,7 @@ function UploadHistoryRow({
       <TableCell className="text-muted-foreground">
         {item.size ? formatFileSize(item.size) : '-'}
       </TableCell>
-      {selectable && (
-        <TableCell>{renderStatusBadge(item.status, item.errorMessage)}</TableCell>
-      )}
+      {selectable && <TableCell>{renderStatusBadge(item.status, item.errorMessage)}</TableCell>}
       <TableCell className="text-muted-foreground">
         {format(new Date(item.uploadedAt), 'MMM dd, yyyy HH:mm')}
       </TableCell>
@@ -307,7 +319,11 @@ function UploadHistoryRow({
                 className="h-7 w-7 text-muted-foreground hover:text-foreground"
                 onClick={handleCopy}
               >
-                {copied ? <IconCheck size={16} className="text-green-500" /> : <IconCopy size={16} />}
+                {copied ? (
+                  <IconCheck size={16} className="text-green-500" />
+                ) : (
+                  <IconCopy size={16} />
+                )}
               </Button>
             </>
           )}

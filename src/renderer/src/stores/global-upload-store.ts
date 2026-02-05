@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { MarkdownData } from '@/lib/markdown-image'
 
 interface GlobalUploadCallbacks {
   onUploadStart?: () => void
@@ -8,21 +9,26 @@ interface GlobalUploadCallbacks {
 interface GlobalUploadState extends GlobalUploadCallbacks {
   isOpen: boolean
   files: File[]
+  markdownData: MarkdownData[]
   openWithFiles: (files: File[], callbacks?: GlobalUploadCallbacks) => void
   appendFiles: (files: File[], callbacks?: GlobalUploadCallbacks) => void
   setOpen: (open: boolean) => void
+  setMarkdownData: (data: MarkdownData[]) => void
+  clearMarkdownData: () => void
   clear: () => void
 }
 
 export const useGlobalUploadStore = create<GlobalUploadState>((set) => ({
   isOpen: false,
   files: [],
+  markdownData: [],
   onUploadStart: undefined,
   onUploadComplete: undefined,
   openWithFiles: (files, callbacks) => {
     set({
       isOpen: true,
       files,
+      markdownData: [],
       onUploadStart: callbacks?.onUploadStart,
       onUploadComplete: callbacks?.onUploadComplete
     })
@@ -51,14 +57,22 @@ export const useGlobalUploadStore = create<GlobalUploadState>((set) => ({
     set({
       isOpen: false,
       files: [],
+      markdownData: [],
       onUploadStart: undefined,
       onUploadComplete: undefined
     })
+  },
+  setMarkdownData: (data) => {
+    set({ markdownData: data })
+  },
+  clearMarkdownData: () => {
+    set({ markdownData: [] })
   },
   clear: () =>
     set({
       isOpen: false,
       files: [],
+      markdownData: [],
       onUploadStart: undefined,
       onUploadComplete: undefined
     })

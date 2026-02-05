@@ -101,7 +101,7 @@ export function FileDetailSheet({
           <SheetHeader className="pt-10">
             <SheetTitle className="flex items-center gap-2">
               {getFileIcon(file, 'small')}
-              <span className="truncate">{file.name}</span>
+              <span className="break-all">{file.name}</span>
             </SheetTitle>
             <SheetDescription>File details</SheetDescription>
           </SheetHeader>
